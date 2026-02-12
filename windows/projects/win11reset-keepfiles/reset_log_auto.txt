@@ -1,0 +1,12 @@
+22:53:07 - === Windows 11 Reset (Keep Files) ===
+22:53:07 - Using ISO: E:\isos\Windows.iso
+22:53:07 - ISO verified: 6.1 GB
+22:53:07 - Mounting ISO...
+22:53:11 - Mounted to: D:
+22:53:11 - Found: D:\setup.exe
+22:53:11 - Launching Windows Setup (Reset mode)...
+22:53:11 - Args: /auto clean /dynamicupdate disable /eula accept /telemetry disable /compat ignorewarning
+22:53:11 - Setup launched! PID: 18868
+22:53:11 - Reset process initiated successfully
+22:53:11 - Keeping this window open for reference...
+22:53:41 - Script complete. Setup is running.

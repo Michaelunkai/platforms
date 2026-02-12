@@ -1,0 +1,15 @@
+ISSUES TO FIX:
+==============
+
+1. TrustedInstaller (TI) Crash
+   - TI crashed or was interrupted during last session
+   - May need to run: sfc /scannow
+
+2. Invalid Package: KB3025096 (Error 0x800f0805 - CBS_E_INVALID_PACKAGE)
+   - Package_for_KB3025096~31bf3856ad364e35~amd64~~6.4.1.0
+   - Package_for_KB3025096~31bf3856ad364e35~x86~~6.4.1.0
+   - Fix: Run DISM /Online /Cleanup-Image /RestoreHealth
+
+3. Hyper-V Update Missing (Error 0x800f080c - CBS_E_UNKNOWN_UPDATE)
+   - Failed to get internal update: Hyper-V in Microsoft-Windows-Foundation-Package
+   - Fix: Enable Hyper-V feature or ignore if not needed

@@ -1,0 +1,63 @@
+﻿Power plan already exists: Nuclear_Performance_v16_SAFE
+Activated power plan: Nuclear_Performance_v16_SAFE
+Power Button Action: DO NOTHING
+Sleep Button Action: DO NOTHING
+Lid Close Action: DO NOTHING
+CPU Minimum State: 100%
+CPU Maximum State: 100%
+Maximum Processor Frequency: UNLIMITED
+System Cooling Policy: ACTIVE
+CPU Boost Mode: Aggressive
+CPU Boost Policy: 100%
+Allow Throttle States: OFF
+Core Parking Min: 100%
+Core Parking Max: 100%
+Core Parking Concurrency: 100%
+Core Parking Distribution: 100%
+Heterogeneous Policy: Performance Cores
+CPU Autonomous Mode: DISABLED
+Energy Performance Preference: 0% (Max Perf)
+Performance Check Interval: 1ms
+Performance Increase Threshold: 0%
+Performance Decrease Threshold: 100%
+Performance Increase Time: 1 (fastest)
+Performance Decrease Time: 100 (slowest)
+Latency Sensitivity: Maximum
+Hard Disk Sleep: NEVER
+NVMe Power Management: Maximum Performance
+Sleep After: NEVER
+Hibernate After: NEVER
+Hybrid Sleep: DISABLED
+Wake Timers: DISABLED
+Unattended Sleep: DISABLED
+USB Selective Suspend: DISABLED
+USB 3 Link Power Management: OFF
+PCIe ASPM: OFF
+Display Turn Off: NEVER
+Adaptive Brightness: OFF
+Display Brightness: 100%
+Dimmed Display Brightness: 100%
+Integrated GPU: Maximum Performance
+Switchable Graphics: MAXIMIZE PERFORMANCE
+WiFi Power Saving: Maximum Performance
+Video Playback Quality: Maximum
+Media Sharing: Prevent Idle
+JavaScript Timer: Maximum Performance
+Hibernation: DISABLED
+Modern Standby (S0): DISABLED
+Power Throttling: DISABLED
+Global Timer Resolution: High Performance
+System Responsiveness: 0 (100% to apps)
+Network Throttling: DISABLED
+Gaming Priority: Maximum
+Paging Executive: DISABLED
+Large System Cache: ENABLED
+NTFS Last Access Update: DISABLED
+8.3 Name Creation: DISABLED
+TCP Nagle Algorithm: DISABLED
+Network Buffers: Optimized
+Battery Saver: DISABLED
+Startup Method 1: Scheduled Task (SYSTEM)
+Startup Method 2: Registry Run (HKLM)
+Startup Method 3: Registry Run (HKCU)
+Startup Method 4: Logon Task

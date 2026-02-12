@@ -1,0 +1,11 @@
+09:19:08 - === Windows 11 Repair Install ===
+09:19:08 - Using ISO: E:\isos\Windows.iso
+09:19:08 - ISO verified: 6.1 GB
+09:19:08 - Mounting ISO...
+09:19:12 - Mounted to: D:
+09:19:12 - Found: D:\setup.exe
+09:19:12 - Launching Windows Setup...
+09:19:12 - Args: /auto upgrade /dynamicupdate disable /eula accept /migratedrivers all /telemetry disable /compat ignorewarning
+09:19:12 - Setup launched! PID: 17488
+09:19:12 - Windows will restart automatically during repair.
+09:19:12 - DO NOT turn off your computer!

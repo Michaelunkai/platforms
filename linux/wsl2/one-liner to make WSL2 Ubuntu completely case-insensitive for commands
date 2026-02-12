@@ -1,0 +1,37 @@
+Here's a one-liner to make WSL2 Ubuntu completely case-insensitive for commands, aliases, and tab completion:
+
+```bash
+echo 'set completion-ignore-case on' >> ~/.inputrc && echo 'shopt -s nocaseglob' >> ~/.bashrc && echo 'bind "set completion-ignore-case on"' >> ~/.bashrc && echo 'for cmd in $(compgen -A alias); do alias "${cmd^^}"="$(alias "$cmd" | cut -d"=" -f2-)"; done' >> ~/.bashrc && source ~/.bashrc
+```
+
+**What this does:**
+- `set completion-ignore-case on` in `.inputrc` - Makes tab completion case-insensitive
+- `shopt -s nocaseglob` - Makes filename globbing case-insensitive  
+- `bind "set completion-ignore-case on"` - Makes command completion case-insensitive
+- The `for` loop creates uppercase versions of all your aliases
+- `source ~/.bashrc` - Applies changes immediately
+
+**After running this, restart your shell or run:**
+```bash
+source ~/.bashrc
+```
+
+**Now these will all work:**
+```bash
+CC          # same as cc (clear)
+LS          # same as ls
+CD          # same as cd
+GREP        # same as grep
+```
+
+**For making ALL commands case-insensitive (advanced):**
+```bash
+echo 'function command_not_found_handle() { command "${1,,}" "${@:2}"; }' >> ~/.bashrc && source ~/.bashrc
+```
+
+This makes any uppercase command automatically try the lowercase version if the uppercase doesn't exist.
+
+**Complete one-liner for everything:**
+```bash
+echo 'set completion-ignore-case on' >> ~/.inputrc && echo 'shopt -s nocaseglob' >> ~/.bashrc && echo 'bind "set completion-ignore-case on"' >> ~/.bashrc && echo 'for cmd in $(compgen -A alias); do alias "${cmd^^}"="$(alias "$cmd" | cut -d"=" -f2-)"; done' >> ~/.bashrc && echo 'function command_not_found_handle() { command "${1,,}" "${@:2}"; }' >> ~/.bashrc && source ~/.bashrc
+```
