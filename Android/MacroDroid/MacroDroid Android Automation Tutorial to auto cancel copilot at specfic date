@@ -1,0 +1,99 @@
+MacroDroid Android Automation Tutorial:
+📆 Automatically Remind and Open GitHub Copilot Pro Cancellation Page on a Specific Date (August 27, 2025)
+This tutorial will teach you how to use MacroDroid (Android automation app) to:
+
+🔔 Automatically display a notification reminder
+
+🌐 Automatically open GitHub’s billing settings page
+
+📅 Run it on a specific date and time (August 27, 2025 at 11:00)
+
+💡 This is perfect for setting subscription cancellation reminders, ensuring you don’t get charged for free trials like GitHub Copilot Pro.
+
+🛠️ TOOLS USED:
+📱 Android smartphone
+
+⚙️ MacroDroid (free from Google Play)
+
+🌐 A working browser installed (e.g. Chrome)
+
+✅ FINAL RESULT:
+At 11:00 AM on August 27, 2025, your phone will:
+
+Show a notification: “Cancel Copilot Pro up to 27/8!”
+
+Automatically open the GitHub billing URL: https://github.com/settings/billing
+
+📘 STEP-BY-STEP GUIDE
+🟢 STEP 1: Create a New Macro in MacroDroid
+Open MacroDroid
+
+Tap the ➕ plus button to create a new macro
+
+🔴 STEP 2: Set the Trigger – Date and Time
+This is when the macro will run.
+
+Tap the red ➕ under Triggers
+
+Select Date/Time
+
+Tap Day of the Month
+
+Set:
+
+Day: 27
+
+Month: August
+
+Time: 11:00 AM
+
+Tap ✅ OK to confirm
+
+🔵 STEP 3: Add First Action – Open the GitHub Billing Page
+Tap the blue ➕ under Actions
+
+Go to Applications
+
+Select Open Website
+
+Enter the URL:
+
+arduino
+Copy
+Edit
+https://github.com/settings/billing
+Tap ✅ OK
+
+🟡 STEP 4: Add Second Action – Display a Reminder Notification
+Tap the blue ➕ under Actions again
+
+Scroll to Notification section
+
+Choose Display Notification (as seen in your Hebrew screenshot)
+
+Configure:
+
+Notification ID: 0
+
+Title: Cancel Copilot Pro
+
+Notification Text: Cancel Copilot Pro up to 27/8!
+
+Leave default settings for:
+
+Channel: High priority
+
+Don't check "Invoke macro when pressed"
+
+Don't check "Clear existing notifications"
+
+Tap ✅ OK
+
+🟢 STEP 5: Save the Macro
+Tap the top bar where it says “Enter macro name”
+
+Name it: Copilot Pro Cancel Reminder
+
+Tap the 💾 Save icon in the top-right corner
+
+🧪 OPTIONAL: Test Before the Real Date

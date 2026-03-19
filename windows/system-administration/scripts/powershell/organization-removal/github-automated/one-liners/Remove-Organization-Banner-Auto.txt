@@ -1,0 +1,35 @@
+# One-Liner: Remove Windows 'Managed by Organization' Banner
+
+## Purpose
+Fully automated script that removes the "Some settings are managed by your organization" banner from Windows Settings.
+
+## What It Does
+1. Cleans any existing repository directory
+2. Clones fresh GitHub repository: Neeraj-Sihag/Unmanage-Windows-Organisation
+3. Modifies script to auto-answer prompts (Yes to start, No to reboot)
+4. Runs automatically without user interaction
+5. Deletes 11 registry policy branches that cause the banner
+
+## Source
+GitHub: https://github.com/Neeraj-Sihag/Unmanage-Windows-Organisation
+Author: Neeraj Sihag
+
+## Requirements
+- PowerShell (Run as Administrator)
+- Git installed
+- Internet connection
+
+## Usage
+Copy and paste this one-liner into PowerShell (Admin):
+
+---
+
+if (Test-Path "Unmanage-Windows-Organisation") { Remove-Item "Unmanage-Windows-Organisation" -Recurse -Force }; git clone https://github.com/Neeraj-Sihag/Unmanage-Windows-Organisation.git; cd Unmanage-Windows-Organisation; (Get-Content .\script.ps1) -replace 'Read-Host "Do you want to start the script.*', '"Yes"' -replace 'Read-Host.*restart now.*', '"No"' | Set-Content .\script-auto.ps1; powershell -ExecutionPolicy Bypass -File .\script-auto.ps1
+
+---
+
+## After Running
+Reboot your computer manually to apply changes.
+
+## Created
+2026-03-12 15:14

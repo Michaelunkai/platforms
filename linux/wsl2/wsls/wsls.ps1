@@ -1,0 +1,5 @@
+﻿<#
+.SYNOPSIS
+    wsls
+#>
+wsl --shutdown

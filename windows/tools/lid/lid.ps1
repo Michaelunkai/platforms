@@ -1,0 +1,7 @@
+﻿<#
+.SYNOPSIS
+    lid - PowerShell script
+.NOTES
+    Extracted: 2026-02-19
+#>
+powercfg -setacvalueindex SCHEME_CURRENT SUB_BUTTONS LIDACTION 0; powercfg -setdcvalueindex SCHEME_CURRENT SUB_BUTTONS LIDACTION 0; powercfg /SETACVALUEINDEX SCHEME_CURRENT SUB_NONE CONSOLELOCK 0; powercfg /SETDCVALUEINDEX SCHEME_CURRENT SUB_NONE CONSOLELOCK 0; powercfg -SetActive SCHEME_CURRENT; Set-ItemProperty -Path 'HKCU:\Control Panel\Desktop\' -Name ScreenSaveActive -Value 0

@@ -1,0 +1,1 @@
+Set-ExecutionPolicy RemoteSigned -Scope CurrentUser; iwr -useb https://raw.githubusercontent.com/okibcn/wslcompact/main/setup | iex; refreshenv; wslcompact -c -y ubuntu  ubuntu2

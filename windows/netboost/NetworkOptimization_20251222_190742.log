@@ -1,0 +1,456 @@
+[2025-12-22 19:07:42] [Header] ╔══════════════════════════════════════════════════════════════════╗
+║                                                                  ║
+║     ULTIMATE NETWORK SPEED OPTIMIZER v2.0.0                    ║
+║     Maximum Performance • Zero Downtime • No Reboot Required     ║
+║                                                                  ║
+╚══════════════════════════════════════════════════════════════════╝
+[2025-12-22 19:07:42] [Success] Administrator privileges confirmed
+[2025-12-22 19:07:42] [Info] Script started at: 12/22/2025 19:07:42
+[2025-12-22 19:07:42] [Info] Log file: F:\study\Platforms\windows\netboost\NetworkOptimization_20251222_190742.log
+[2025-12-22 19:07:42] [Header] STEP 1: Creating backup of current network configuration
+[2025-12-22 19:07:42] [Info] Creating backup of current network settings...
+[2025-12-22 19:07:44] [Success] Backup created successfully: F:\study\Platforms\windows\netboost\NetworkBackup_20251222_190742.json
+[2025-12-22 19:07:44] [Header] STEP 2: Detecting active network adapter
+[2025-12-22 19:07:44] [Success] Detected WiFi adapter via WMI: Wi-Fi
+[2025-12-22 19:07:44] [Header] STEP 3: Optimizing TCP/IP Stack Parameters
+[2025-12-22 19:07:44] [Info] Configuring TCP Auto-Tuning to 'experimental' for maximum throughput
+[2025-12-22 19:07:44] [Success] TCP Auto-Tuning set to experimental mode
+[2025-12-22 19:07:44] [Info] Enabling Receive-Side Scaling (RSS) for multi-core optimization
+[2025-12-22 19:07:44] [Success] RSS enabled successfully
+[2025-12-22 19:07:44] [Info] Configuring Chimney Offload for optimal performance
+[2025-12-22 19:07:44] [Success] Chimney Offload enabled
+[2025-12-22 19:07:44] [Info] Enabling Direct Cache Access (DCA)
+[2025-12-22 19:07:44] [Success] DCA enabled successfully
+[2025-12-22 19:07:44] [Info] Enabling NetDMA for improved data transfers
+[2025-12-22 19:07:44] [Success] NetDMA enabled successfully
+[2025-12-22 19:07:44] [Info] Enabling ECN (Explicit Congestion Notification)
+[2025-12-22 19:07:44] [Success] ECN enabled successfully
+[2025-12-22 19:07:44] [Info] Enabling RFC 1323 Timestamps
+[2025-12-22 19:07:44] [Success] RFC 1323 Timestamps enabled
+[2025-12-22 19:07:44] [Info] Setting Initial RTO to 2000ms for improved connection stability
+[2025-12-22 19:07:44] [Success] Initial RTO set to 2000ms
+[2025-12-22 19:07:44] [Info] Enabling Receive Segment Coalescing (RSC)
+[2025-12-22 19:07:44] [Success] RSC enabled successfully
+[2025-12-22 19:07:44] [Info] Disabling Non-SACK RTT Resiliency
+[2025-12-22 19:07:44] [Success] Non-SACK RTT Resiliency disabled
+[2025-12-22 19:07:44] [Info] Setting Max SYN Retransmissions to 2
+[2025-12-22 19:07:44] [Success] Max SYN Retransmissions set to 2
+[2025-12-22 19:07:44] [Info] Enabling TCP Fast Open
+[2025-12-22 19:07:44] [Success] TCP Fast Open enabled
+[2025-12-22 19:07:45] [Info] Enabling TCP Fast Open Fallback
+[2025-12-22 19:07:45] [Success] TCP Fast Open Fallback enabled
+[2025-12-22 19:07:45] [Info] Enabling HyStart algorithm
+[2025-12-22 19:07:45] [Success] HyStart enabled successfully
+[2025-12-22 19:07:45] [Info] Enabling Proportional Rate Reduction
+[2025-12-22 19:07:45] [Success] Proportional Rate Reduction enabled
+[2025-12-22 19:07:45] [Info] Setting Pacing Profile to 'always' for consistent throughput
+[2025-12-22 19:07:45] [Success] Pacing Profile set to always
+[2025-12-22 19:07:45] [Info] Applying TCP/IP Registry Optimizations
+[2025-12-22 19:07:45] [Success] TCP Window Size set to 65535 bytes
+[2025-12-22 19:07:45] [Success] TCP Window Scaling enabled (RFC 1323)
+[2025-12-22 19:07:45] [Success] Default TTL set to 64
+[2025-12-22 19:07:45] [Success] Path MTU Discovery enabled
+[2025-12-22 19:07:45] [Success] MTU Black Hole Detection disabled
+[2025-12-22 19:07:45] [Success] TCP Max Duplicate Acks set to 2
+[2025-12-22 19:07:45] [Success] TCP Timed Wait Delay reduced to 30 seconds
+[2025-12-22 19:07:45] [Success] Max User Port increased to 65534
+[2025-12-22 19:07:45] [Success] TCP Max Connect Response Retransmissions set to 2
+[2025-12-22 19:07:45] [Success] TCP Max Data Retransmissions set to 5
+[2025-12-22 19:07:45] [Success] SYN Attack Protection enabled
+[2025-12-22 19:07:45] [Success] TCP Selective Acknowledgments enabled
+[2025-12-22 19:07:45] [Success] TCP Initial RTT set to 300ms
+[2025-12-22 19:07:45] [Success] TCP Acknowledgment Frequency optimized
+[2025-12-22 19:07:45] [Success] TCP Ports Exhausted threshold set
+[2025-12-22 19:07:45] [Header] STEP 4: Optimizing Network Adapter Settings
+[2025-12-22 19:07:45] [Info] Removing Windows Network Throttling (NetworkThrottlingIndex)
+[2025-12-22 19:07:45] [Success] Network Throttling Index disabled (maximum network priority)
+[2025-12-22 19:07:45] [Success] System Responsiveness optimized for network performance
+[2025-12-22 19:07:45] [Info] Optimizing AFD (Winsock) parameters for maximum throughput
+[2025-12-22 19:07:45] [Success] AFD Default Receive Window set to 16384
+[2025-12-22 19:07:45] [Success] AFD Default Send Window set to 16384
+[2025-12-22 19:07:45] [Success] AFD Buffer Multiplier increased to 1024
+[2025-12-22 19:07:45] [Success] AFD Fast Send Datagram Threshold set to 1500
+[2025-12-22 19:07:45] [Success] AFD Dynamic Backlog enabled
+[2025-12-22 19:07:45] [Success] AFD Minimum Dynamic Backlog set to 128
+[2025-12-22 19:07:45] [Success] AFD Maximum Dynamic Backlog set to 2048
+[2025-12-22 19:07:45] [Success] AFD Dynamic Backlog Growth Delta set to 128
+[2025-12-22 19:07:45] [Success] AFD Transmit Worker threads set to 32
+[2025-12-22 19:07:45] [Success] AFD Large Buffer Size set to 4096
+[2025-12-22 19:07:45] [Success] AFD Medium Buffer Size set to 1504
+[2025-12-22 19:07:45] [Success] AFD Small Buffer Size set to 128
+[2025-12-22 19:07:45] [Info] Optimizing NDIS network driver parameters
+[2025-12-22 19:07:45] [Success] NDIS Max RSS CPUs set to auto (use all available cores)
+[2025-12-22 19:07:45] [Success] NDIS RSS Base CPU set to 0
+[2025-12-22 19:07:45] [Info] Optimizing LAN Manager workstation settings
+[2025-12-22 19:07:45] [Success] LanMan Max Commands set to 2048
+[2025-12-22 19:07:45] [Success] LanMan Max Threads set to 30
+[2025-12-22 19:07:45] [Success] LanMan Max Collection Count set to 32
+[2025-12-22 19:07:45] [Success] LanMan Keep Connection time set to 3600 seconds
+[2025-12-22 19:07:45] [Success] LanMan Dormant File Limit disabled
+[2025-12-22 19:07:45] [Info] Optimizing DNS Client cache settings
+[2025-12-22 19:07:45] [Success] DNS Cache Hash Table Bucket Size optimized
+[2025-12-22 19:07:45] [Success] DNS Cache Hash Table Size increased to 384
+[2025-12-22 19:07:45] [Success] DNS Max Cache TTL set to 86400 seconds (24 hours)
+[2025-12-22 19:07:45] [Success] DNS Max Negative Cache TTL set to 900 seconds
+[2025-12-22 19:07:45] [Success] DNS Auto DoH enabled
+[2025-12-22 19:07:45] [Info] Optimizing WiFi adapter advanced properties for: Wi-Fi
+[2025-12-22 19:07:45] [Success] Found adapter registry path: Microsoft.PowerShell.Core\Registry::HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Class\{4d36e972-e325-11ce-bfc1-08002be10318}\0000
+[2025-12-22 19:07:45] [Success] Interrupt Moderation enabled
+[2025-12-22 19:07:45] [Success] Receive Buffers increased to 512
+[2025-12-22 19:07:45] [Success] Transmit Buffers increased to 512
+[2025-12-22 19:07:45] [Success] Large Send Offload v2 (IPv4) enabled
+[2025-12-22 19:07:45] [Success] Large Send Offload v2 (IPv6) enabled
+[2025-12-22 19:07:45] [Success] IP Checksum Offload (IPv4) enabled for Tx and Rx
+[2025-12-22 19:07:45] [Success] TCP Checksum Offload (IPv4) enabled for Tx and Rx
+[2025-12-22 19:07:45] [Success] UDP Checksum Offload (IPv4) enabled for Tx and Rx
+[2025-12-22 19:07:45] [Success] TCP Checksum Offload (IPv6) enabled for Tx and Rx
+[2025-12-22 19:07:45] [Success] UDP Checksum Offload (IPv6) enabled for Tx and Rx
+[2025-12-22 19:07:45] [Success] Power Management restrictions disabled (PnPCapabilities=24)
+[2025-12-22 19:07:45] [Success] Roaming Preferred Band Type set to 5GHz
+[2025-12-22 19:07:45] [Success] Roaming Aggressiveness set to maximum (3)
+[2025-12-22 19:07:45] [Success] 802.11n mode enabled
+[2025-12-22 19:07:45] [Success] 802.11ac mode enabled
+[2025-12-22 19:07:45] [Success] 802.11ax (WiFi 6) mode enabled
+[2025-12-22 19:07:45] [Success] Channel Width set to maximum (160MHz)
+[2025-12-22 19:07:45] [Success] Throughput Booster enabled
+[2025-12-22 19:07:45] [Success] Packet Coalescing disabled for lower latency
+[2025-12-22 19:07:45] [Success] Wireless Multimedia (WMM) enabled
+[2025-12-22 19:07:45] [Success] MIMO Power Save Mode disabled (max performance)
+[2025-12-22 19:07:45] [Success] Transmit Power set to maximum (100%)
+[2025-12-22 19:07:45] [Header] STEP 5: Configuring DNS, QoS, and Advanced Network Settings
+[2025-12-22 19:07:45] [Info] Configuring optimized DNS servers (Cloudflare & Google)
+[2025-12-22 19:07:45] [Success] Primary DNS set to 1.1.1.1 (Cloudflare)
+[2025-12-22 19:07:45] [Success] Secondary DNS added: 1.0.0.1 (Cloudflare)
+[2025-12-22 19:07:46] [Success] Tertiary DNS added: 8.8.8.8 (Google)
+[2025-12-22 19:07:46] [Success] Quaternary DNS added: 8.8.4.4 (Google)
+[2025-12-22 19:07:46] [Info] Flushing DNS cache to apply new settings
+[2025-12-22 19:07:46] [Success] DNS cache flushed successfully
+[2025-12-22 19:07:46] [Info] Configuring QoS packet scheduler for optimal network performance
+[2025-12-22 19:07:46] [Success] QoS bandwidth reservation disabled (100% bandwidth available)
+[2025-12-22 19:07:46] [Success] QoS Network Throttling removed
+[2025-12-22 19:07:46] [Success] System Responsiveness prioritized for network
+[2025-12-22 19:07:46] [Info] Optimizing Windows Firewall for better performance
+[2025-12-22 19:07:46] [Success] Stateful FTP disabled for better performance
+[2025-12-22 19:07:46] [Success] Stateful PPTP disabled for better performance
+[2025-12-22 19:07:46] [Info] Optimizing MTU size for WiFi connection
+[2025-12-22 19:07:46] [Success] MTU set to 1500 bytes (optimal for WiFi)
+[2025-12-22 19:07:46] [Info] Optimizing interface metric for WiFi priority
+[2025-12-22 19:07:46] [Success] Interface metric set to 15 (high priority)
+[2025-12-22 19:07:46] [Info] Optimizing IPv6 settings
+[2025-12-22 19:07:46] [Success] IPv6 privacy extensions enabled
+[2025-12-22 19:07:46] [Success] IPv6 fully enabled (no disabled components)
+[2025-12-22 19:07:46] [Success] IPv6 MTU set to 1500 bytes
+[2025-12-22 19:07:46] [Info] Configuring advanced Windows Auto-Tuning parameters
+[2025-12-22 19:07:46] [Success] Congestion Provider set to CTCP (Compound TCP)
+[2025-12-22 19:07:46] [Info] Disabling power-saving features on network adapter
+[2025-12-22 19:07:46] [Success] USB Selective Suspend disabled for network stability
+[2025-12-22 19:07:47] [Success] Network adapter power management disabled via CIM
+[2025-12-22 19:07:47] [Info] Ensuring critical network services are running optimally
+[2025-12-22 19:07:47] [Info] Clearing ARP cache for fresh network state
+[2025-12-22 19:07:47] [Success] ARP cache cleared successfully
+[2025-12-22 19:07:47] [Info] Optimizing NetBIOS over TCP/IP settings
+[2025-12-22 19:07:47] [Success] LMHOSTS lookup disabled
+[2025-12-22 19:07:47] [Success] NetBIOS Node Type set to P-node (2)
+[2025-12-22 19:07:47] [Info] Optimizing SMB settings for better network file sharing
+[2025-12-22 19:07:47] [Success] SMB Server optimized for maximum throughput (Size=3)
+[2025-12-22 19:07:47] [Success] SMB1 dependency removed for better performance
+[2025-12-22 19:07:47] [Info] Optimizing Network Discovery settings
+[2025-12-22 19:07:47] [Info] Applying Aggressive Speed Optimizations...
+[2025-12-22 19:07:47] [Success] Nagle Algorithm disabled on all interfaces (lower latency)
+[2025-12-22 19:07:47] [Success] TCP connection limit maximized
+[2025-12-22 19:07:47] [Success] Max connections per server increased to 16
+[2025-12-22 19:07:47] [Success] TCP heuristics disabled for consistent performance
+[2025-12-22 19:07:47] [Success] Congestion control set to CUBIC (high bandwidth optimized)
+[2025-12-22 19:07:47] [Success] IRP Stack Size increased to 50
+[2025-12-22 19:07:47] [Success] Global Max TCP Window Size set to 16MB
+[2025-12-22 19:07:47] [Success] TCP Receive Buffer Space set to 16MB
+[2025-12-22 19:07:47] [Success] TCP Send Buffer Space set to 16MB
+[2025-12-22 19:07:47] [Success] Task Offload disabled for reliable CPU processing
+[2025-12-22 19:07:47] [Success] TCP Keepalive optimized (60s timeout, 1s interval)
+[2025-12-22 19:07:47] [Success] LanMan bandwidth throttling disabled
+[2025-12-22 19:07:47] [Success] Large MTU enabled for LanMan
+[2025-12-22 19:07:48] [Success] MSMQ TCP No Delay enabled
+[2025-12-22 19:07:48] [Info] Applying Download-Specific Optimizations...
+[2025-12-22 19:07:48] [Success] TCP Auto-Tuning set to EXPERIMENTAL (max receive window)
+[2025-12-22 19:07:48] [Success] ECN enabled for better congestion control
+[2025-12-22 19:07:48] [Success] TCP Window Scaling + Timestamps enabled (RFC 1323)
+[2025-12-22 19:07:48] [Success] Default Receive Window set to 64KB
+[2025-12-22 19:07:48] [Success] Default Send Window set to 64KB
+[2025-12-22 19:07:48] [Success] TCP Timestamps enabled for better RTT
+[2025-12-22 19:07:48] [Success] Delivery Optimization P2P disabled (more bandwidth for you)
+[2025-12-22 19:07:48] [Success] Background apps network access limited
+[2025-12-22 19:07:48] [Success] AFD socket windows increased to 64KB
+[2025-12-22 19:07:48] [Success] NDIS filter limit increased
+[2025-12-22 19:07:48] [Success] Bandwidth reservation disabled (full speed available)
+[2025-12-22 19:07:48] [Success] NetBT cache timeout optimized
+[2025-12-22 19:07:48] [Success] Per-interface TCP window size set to 64KB
+[2025-12-22 19:07:48] [Success] IPv6 transition technologies disabled (pure IPv4 speed)
+[2025-12-22 19:07:48] [Success] WinHTTP connections per server increased to 32
+[2025-12-22 19:07:48] [Success] Multimedia network throttling completely disabled
+[2025-12-22 19:07:48] [Header] STEP 6: Finalizing Optimizations and System Cleanup
+[2025-12-22 19:07:48] [Info] Performing clean Winsock catalog and IP stack refresh
+[2025-12-22 19:07:48] [Success] Winsock catalog integrity verified (no reset required for immediate application)
+[2025-12-22 19:07:48] [Info] Refreshing network adapter configuration
+[2025-12-22 19:07:48] [Info] Refreshing DHCP lease...
+[2025-12-22 19:07:52] [Success] DHCP lease renewed successfully
+[2025-12-22 19:07:52] [Info] Registering DNS records
+[2025-12-22 19:07:55] [Success] DNS registration initiated
+[2025-12-22 19:07:55] [Info] Optimizing Windows Update delivery for network performance
+[2025-12-22 19:07:55] [Success] Delivery Optimization set to LAN-only mode
+[2025-12-22 19:07:55] [Success] Download throttle backoff optimized
+[2025-12-22 19:07:55] [Info] Optimizing Network Location Awareness service
+[2025-12-22 19:07:55] [Success] Active network probing enabled for faster detection
+[2025-12-22 19:07:55] [Info] Optimizing BITS for better background transfer performance
+[2025-12-22 19:07:55] [Success] BITS max bandwidth limit disabled (use full available)
+[2025-12-22 19:07:55] [Info] Configuring Teredo and IPv6 transition technologies
+[2025-12-22 19:07:55] [Success] Teredo set to client mode
+[2025-12-22 19:07:56] [Success] ISATAP enabled
+[2025-12-22 19:07:56] [Info] Optimizing Multimedia Class Scheduler for network priority
+[2025-12-22 19:07:56] [Success] MMCSS Network Throttling Index disabled
+[2025-12-22 19:07:56] [Success] MMCSS System Responsiveness maximized
+[2025-12-22 19:07:56] [Success] MMCSS task profiles optimized for high priority
+[2025-12-22 19:07:56] [Info] Disabling Windows Error Reporting network usage
+[2025-12-22 19:07:56] [Success] Windows Error Reporting disabled to preserve bandwidth
+[2025-12-22 19:07:56] [Info] Optimizing Performance Counters for network monitoring
+[2025-12-22 19:07:57] [Success] Performance counters rebuilt successfully
+[2025-12-22 19:07:57] [Header] STEP 7: Verifying Network Optimizations
+[2025-12-22 19:07:57] [Info] Gathering post-optimization network statistics...
+[2025-12-22 19:07:57] [Info] Current TCP Global Settings:
+[2025-12-22 19:07:57] [Info] Querying active state...
+[2025-12-22 19:07:57] [Info] TCP Global Parameters
+[2025-12-22 19:07:57] [Info] ----------------------------------------------
+[2025-12-22 19:07:57] [Info] Receive-Side Scaling State          : enabled 
+[2025-12-22 19:07:57] [Info] Receive Window Auto-Tuning Level    : experimental 
+[2025-12-22 19:07:57] [Info] Add-On Congestion Control Provider  : default 
+[2025-12-22 19:07:57] [Info] ECN Capability                      : enabled 
+[2025-12-22 19:07:57] [Info] RFC 1323 Timestamps                 : enabled 
+[2025-12-22 19:07:57] [Info] Initial RTO                         : 2000 
+[2025-12-22 19:07:57] [Info] Receive Segment Coalescing State    : enabled 
+[2025-12-22 19:07:57] [Info] Non Sack Rtt Resiliency             : disabled 
+[2025-12-22 19:07:57] [Info] Max SYN Retransmissions             : 2 
+[2025-12-22 19:07:57] [Info] Fast Open                           : enabled 
+[2025-12-22 19:07:57] [Info] Fast Open Fallback                  : enabled 
+[2025-12-22 19:07:57] [Info] HyStart                             : enabled 
+[2025-12-22 19:07:57] [Info] Proportional Rate Reduction         : enabled 
+[2025-12-22 19:07:57] [Info] Pacing Profile                      : always 
+[2025-12-22 19:07:57] [Info] WiFi Adapter Information:
+[2025-12-22 19:07:57] [Info] There is 1 interface on the system: 
+[2025-12-22 19:07:57] [Info] Network shell commands need location permission to access WLAN information. Turn on Location services on the Location page in Privacy & security settings.
+[2025-12-22 19:07:57] [Info] Here is the URI for the Location page in the Settings app: ms-settings:privacy-location
+[2025-12-22 19:07:57] [Info] To open the Location page in the Settings app, run the following command:
+[2025-12-22 19:07:57] [Info] start ms-settings:privacy-location
+[2025-12-22 19:07:57] [Info] Or, to open the Location page from the Run dialog box, press Windows logo key + R, and then copy and paste the URI above.
+[2025-12-22 19:07:57] [Info] Function WlanQueryInterface returns error 5:
+[2025-12-22 19:07:57] [Info] Access is denied.
+[2025-12-22 19:07:57] [Info] IP Configuration:
+[2025-12-22 19:07:57] [Info] Windows IP Configuration
+[2025-12-22 19:07:57] [Info]    Host Name . . . . . . . . . . . . : DESKTOP-PQN7RUH
+[2025-12-22 19:07:57] [Info]    Primary Dns Suffix  . . . . . . . : 
+[2025-12-22 19:07:57] [Info]    Node Type . . . . . . . . . . . . : Peer-Peer
+[2025-12-22 19:07:57] [Info]    IP Routing Enabled. . . . . . . . : No
+[2025-12-22 19:07:57] [Info]    WINS Proxy Enabled. . . . . . . . : No
+[2025-12-22 19:07:57] [Info]    DNS Suffix Search List. . . . . . : lan
+[2025-12-22 19:07:57] [Info] Wireless LAN adapter Wi-Fi:
+[2025-12-22 19:07:57] [Info]    Connection-specific DNS Suffix  . : lan
+[2025-12-22 19:07:57] [Info]    Description . . . . . . . . . . . : MediaTek Wi-Fi 6E MT7922 (RZ616) 160MHz Wireless LAN Card
+[2025-12-22 19:07:57] [Info]    Physical Address. . . . . . . . . : BC-F4-D4-E2-03-5D
+[2025-12-22 19:07:57] [Info]    DHCP Enabled. . . . . . . . . . . : Yes
+[2025-12-22 19:07:57] [Info]    Autoconfiguration Enabled . . . . : Yes
+[2025-12-22 19:07:57] [Info]    Link-local IPv6 Address . . . . . : fe80::da7b:f6b1:7f72:7c13%7(Preferred) 
+[2025-12-22 19:07:57] [Info]    IPv4 Address. . . . . . . . . . . : 192.168.1.178(Preferred) 
+[2025-12-22 19:07:57] [Info]    Subnet Mask . . . . . . . . . . . : 255.255.255.0
+[2025-12-22 19:07:57] [Info]    Lease Obtained. . . . . . . . . . : Monday, 22 December 2025 19:07:52
+[2025-12-22 19:07:57] [Info]    Lease Expires . . . . . . . . . . : Tuesday, 23 December 2025 7:07:52
+[2025-12-22 19:07:57] [Info]    Default Gateway . . . . . . . . . : 192.168.1.1
+[2025-12-22 19:07:57] [Info]    DHCP Server . . . . . . . . . . . : 192.168.1.1
+[2025-12-22 19:07:57] [Info]    DHCPv6 IAID . . . . . . . . . . . : 364704980
+[2025-12-22 19:07:57] [Info]    DHCPv6 Client DUID. . . . . . . . : 00-01-00-01-30-B9-07-4B-BC-F4-D4-E2-03-5D
+[2025-12-22 19:07:57] [Info]    DNS Servers . . . . . . . . . . . : fe80::a2b5:3cff:fe51:da00%7
+[2025-12-22 19:07:57] [Info]                                        1.1.1.1
+[2025-12-22 19:07:57] [Info]                                          DoH: https://cloudflare-dns.com/dns-query
+[2025-12-22 19:07:57] [Info]                                        1.0.0.1
+[2025-12-22 19:07:57] [Info]                                          DoH: https://cloudflare-dns.com/dns-query
+[2025-12-22 19:07:57] [Info]                                        8.8.8.8
+[2025-12-22 19:07:57] [Info]                                          DoH: https://dns.google/dns-query
+[2025-12-22 19:07:57] [Info]                                        8.8.4.4
+[2025-12-22 19:07:57] [Info]                                          DoH: https://dns.google/dns-query
+[2025-12-22 19:07:57] [Info]                                        fe80::a2b5:3cff:fe51:da00%7
+[2025-12-22 19:07:57] [Info]    NetBIOS over Tcpip. . . . . . . . : Enabled
+[2025-12-22 19:07:57] [Info]    Connection-specific DNS Suffix Search List :
+[2025-12-22 19:07:57] [Info]                                        lan
+[2025-12-22 19:07:57] [Info]                                        lan
+[2025-12-22 19:07:57] [Info] Tunnel adapter isatap.{1DBD20DC-1F95-4D26-9F70-9C9422117861}:
+[2025-12-22 19:07:57] [Info]    Connection-specific DNS Suffix  . : 
+[2025-12-22 19:07:57] [Info]    Description . . . . . . . . . . . : Microsoft ISATAP Adapter
+[2025-12-22 19:07:57] [Info]    Physical Address. . . . . . . . . : 00-00-00-00-00-00-00-E0
+[2025-12-22 19:07:57] [Info]    DHCP Enabled. . . . . . . . . . . : No
+[2025-12-22 19:07:57] [Info]    Autoconfiguration Enabled . . . . : Yes
+[2025-12-22 19:07:57] [Info]    Link-local IPv6 Address . . . . . : fe80::5efe:172.24.128.1%11(Preferred) 
+[2025-12-22 19:07:57] [Info]    Default Gateway . . . . . . . . . : 
+[2025-12-22 19:07:57] [Info]    DHCPv6 IAID . . . . . . . . . . . : 184549376
+[2025-12-22 19:07:57] [Info]    DHCPv6 Client DUID. . . . . . . . : 00-01-00-01-30-B9-07-4B-BC-F4-D4-E2-03-5D
+[2025-12-22 19:07:57] [Info]    NetBIOS over Tcpip. . . . . . . . : Disabled
+[2025-12-22 19:07:57] [Info] Tunnel adapter isatap.{5240F4D5-7508-43CA-BC08-45D3734A6CA0}:
+[2025-12-22 19:07:57] [Info]    Connection-specific DNS Suffix  . : 
+[2025-12-22 19:07:57] [Info]    Description . . . . . . . . . . . : Microsoft ISATAP Adapter
+[2025-12-22 19:07:57] [Info]    Physical Address. . . . . . . . . : 00-00-00-00-00-00-00-E0
+[2025-12-22 19:07:57] [Info]    DHCP Enabled. . . . . . . . . . . : No
+[2025-12-22 19:07:57] [Info]    Autoconfiguration Enabled . . . . : Yes
+[2025-12-22 19:07:57] [Info]    Link-local IPv6 Address . . . . . : fe80::5efe:172.23.80.1%33(Preferred) 
+[2025-12-22 19:07:57] [Info]    Default Gateway . . . . . . . . . : 
+[2025-12-22 19:07:57] [Info]    DHCPv6 IAID . . . . . . . . . . . : 553648128
+[2025-12-22 19:07:57] [Info]    DHCPv6 Client DUID. . . . . . . . : 00-01-00-01-30-B9-07-4B-BC-F4-D4-E2-03-5D
+[2025-12-22 19:07:57] [Info]    NetBIOS over Tcpip. . . . . . . . : Disabled
+[2025-12-22 19:07:57] [Info] Wireless LAN adapter Local Area Connection* 9:
+[2025-12-22 19:07:57] [Info]    Media State . . . . . . . . . . . : Media disconnected
+[2025-12-22 19:07:57] [Info]    Connection-specific DNS Suffix  . : 
+[2025-12-22 19:07:57] [Info]    Description . . . . . . . . . . . : Microsoft Wi-Fi Direct Virtual Adapter
+[2025-12-22 19:07:57] [Info]    Physical Address. . . . . . . . . : BE-F4-D4-E2-23-7D
+[2025-12-22 19:07:57] [Info]    DHCP Enabled. . . . . . . . . . . : Yes
+[2025-12-22 19:07:57] [Info]    Autoconfiguration Enabled . . . . : Yes
+[2025-12-22 19:07:57] [Info] Wireless LAN adapter Local Area Connection* 10:
+[2025-12-22 19:07:57] [Info]    Media State . . . . . . . . . . . : Media disconnected
+[2025-12-22 19:07:57] [Info]    Connection-specific DNS Suffix  . : 
+[2025-12-22 19:07:57] [Info]    Description . . . . . . . . . . . : Microsoft Wi-Fi Direct Virtual Adapter #2
+[2025-12-22 19:07:57] [Info]    Physical Address. . . . . . . . . : BE-F4-D4-E2-33-6D
+[2025-12-22 19:07:57] [Info]    DHCP Enabled. . . . . . . . . . . : Yes
+[2025-12-22 19:07:57] [Info]    Autoconfiguration Enabled . . . . : Yes
+[2025-12-22 19:07:57] [Info] Tunnel adapter isatap.lan:
+[2025-12-22 19:07:57] [Info]    Connection-specific DNS Suffix  . : lan
+[2025-12-22 19:07:57] [Info]    Description . . . . . . . . . . . : Microsoft ISATAP Adapter
+[2025-12-22 19:07:57] [Info]    Physical Address. . . . . . . . . : 00-00-00-00-00-00-00-E0
+[2025-12-22 19:07:57] [Info]    DHCP Enabled. . . . . . . . . . . : No
+[2025-12-22 19:07:57] [Info]    Autoconfiguration Enabled . . . . : Yes
+[2025-12-22 19:07:57] [Info]    Link-local IPv6 Address . . . . . : fe80::5efe:192.168.1.178%9(Preferred) 
+[2025-12-22 19:07:57] [Info]    Default Gateway . . . . . . . . . : 
+[2025-12-22 19:07:57] [Info]    DHCPv6 IAID . . . . . . . . . . . : 150994944
+[2025-12-22 19:07:57] [Info]    DHCPv6 Client DUID. . . . . . . . : 00-01-00-01-30-B9-07-4B-BC-F4-D4-E2-03-5D
+[2025-12-22 19:07:57] [Info]    DNS Servers . . . . . . . . . . . : fe80::a2b5:3cff:fe51:da00%7
+[2025-12-22 19:07:57] [Info]                                        1.1.1.1
+[2025-12-22 19:07:57] [Info]                                          DoH: https://cloudflare-dns.com/dns-query
+[2025-12-22 19:07:57] [Info]                                        1.0.0.1
+[2025-12-22 19:07:57] [Info]                                          DoH: https://cloudflare-dns.com/dns-query
+[2025-12-22 19:07:57] [Info]                                        8.8.8.8
+[2025-12-22 19:07:57] [Info]                                          DoH: https://dns.google/dns-query
+[2025-12-22 19:07:57] [Info]                                        8.8.4.4
+[2025-12-22 19:07:57] [Info]                                          DoH: https://dns.google/dns-query
+[2025-12-22 19:07:57] [Info]                                        fe80::a2b5:3cff:fe51:da00%7
+[2025-12-22 19:07:57] [Info]    NetBIOS over Tcpip. . . . . . . . : Disabled
+[2025-12-22 19:07:57] [Info] Ethernet adapter Bluetooth Network Connection:
+[2025-12-22 19:07:57] [Info]    Media State . . . . . . . . . . . : Media disconnected
+[2025-12-22 19:07:57] [Info]    Connection-specific DNS Suffix  . : 
+[2025-12-22 19:07:57] [Info]    Description . . . . . . . . . . . : Bluetooth Device (Personal Area Network)
+[2025-12-22 19:07:57] [Info]    Physical Address. . . . . . . . . : BC-F4-D4-E2-03-5E
+[2025-12-22 19:07:57] [Info]    DHCP Enabled. . . . . . . . . . . : Yes
+[2025-12-22 19:07:57] [Info]    Autoconfiguration Enabled . . . . : Yes
+[2025-12-22 19:07:57] [Info] Ethernet adapter vEthernet (Default Switch):
+[2025-12-22 19:07:57] [Info]    Connection-specific DNS Suffix  . : 
+[2025-12-22 19:07:57] [Info]    Description . . . . . . . . . . . : Hyper-V Virtual Ethernet Adapter
+[2025-12-22 19:07:57] [Info]    Physical Address. . . . . . . . . : 00-15-5D-50-68-00
+[2025-12-22 19:07:57] [Info]    DHCP Enabled. . . . . . . . . . . : No
+[2025-12-22 19:07:57] [Info]    Autoconfiguration Enabled . . . . : Yes
+[2025-12-22 19:07:57] [Info]    Link-local IPv6 Address . . . . . : fe80::b9a2:752b:79a9:c15b%18(Preferred) 
+[2025-12-22 19:07:57] [Info]    IPv4 Address. . . . . . . . . . . : 172.24.128.1(Preferred) 
+[2025-12-22 19:07:57] [Info]    Subnet Mask . . . . . . . . . . . : 255.255.240.0
+[2025-12-22 19:07:57] [Info]    Default Gateway . . . . . . . . . : 
+[2025-12-22 19:07:57] [Info]    DHCPv6 IAID . . . . . . . . . . . : 301995357
+[2025-12-22 19:07:57] [Info]    DHCPv6 Client DUID. . . . . . . . : 00-01-00-01-30-B9-07-4B-BC-F4-D4-E2-03-5D
+[2025-12-22 19:07:57] [Info]    NetBIOS over Tcpip. . . . . . . . : Enabled
+[2025-12-22 19:07:57] [Info] Ethernet adapter vEthernet (WSL):
+[2025-12-22 19:07:57] [Info]    Connection-specific DNS Suffix  . : 
+[2025-12-22 19:07:57] [Info]    Description . . . . . . . . . . . : Hyper-V Virtual Ethernet Adapter #2
+[2025-12-22 19:07:57] [Info]    Physical Address. . . . . . . . . : 00-15-5D-DD-26-BC
+[2025-12-22 19:07:57] [Info]    DHCP Enabled. . . . . . . . . . . : No
+[2025-12-22 19:07:57] [Info]    Autoconfiguration Enabled . . . . : Yes
+[2025-12-22 19:07:57] [Info]    Link-local IPv6 Address . . . . . : fe80::990:b48:7695:126c%24(Preferred) 
+[2025-12-22 19:07:57] [Info]    IPv4 Address. . . . . . . . . . . : 172.23.80.1(Preferred) 
+[2025-12-22 19:07:57] [Info]    Subnet Mask . . . . . . . . . . . : 255.255.240.0
+[2025-12-22 19:07:57] [Info]    Default Gateway . . . . . . . . . : 
+[2025-12-22 19:07:57] [Info]    DHCPv6 IAID . . . . . . . . . . . : 402658653
+[2025-12-22 19:07:57] [Info]    DHCPv6 Client DUID. . . . . . . . : 00-01-00-01-30-B9-07-4B-BC-F4-D4-E2-03-5D
+[2025-12-22 19:07:57] [Info]    NetBIOS over Tcpip. . . . . . . . : Enabled
+[2025-12-22 19:07:57] [Header] STEP 8: Generating Optimization Report
+[2025-12-22 19:07:57] [Info] 
+╔══════════════════════════════════════════════════════════════════╗
+║                  OPTIMIZATION COMPLETE                            ║
+╚══════════════════════════════════════════════════════════════════╝
+
+EXECUTION SUMMARY:
+─────────────────────────────────────────────────────────────────
+  Start Time:              2025-12-22 19:07:42
+  End Time:                2025-12-22 19:07:57
+  Total Duration:          00:15
+
+RESULTS:
+─────────────────────────────────────────────────────────────────
+  Total Optimizations:     211
+  Successful Operations:   150
+  Warnings:                0
+  Errors:                  0
+
+OPTIMIZATIONS APPLIED:
+─────────────────────────────────────────────────────────────────
+  ✓ TCP/IP Stack Parameters (20+ settings)
+  ✓ Network Adapter Hardware Acceleration
+  ✓ WiFi 6/6E Specific Enhancements
+  ✓ Receive/Transmit Buffer Optimization
+  ✓ Interrupt Moderation & RSS
+  ✓ Large Send Offload (LSO) & Checksum Offload
+  ✓ Power Management Disabled
+  ✓ DNS Cache & Resolution (Cloudflare + Google)
+  ✓ QoS Bandwidth Reservation Removed
+  ✓ Network Throttling Disabled
+  ✓ AFD (Winsock) Parameters Maximized
+  ✓ MTU Optimization (1500 bytes)
+  ✓ Interface Priority Settings
+  ✓ IPv6 Full Enablement & Optimization
+  ✓ Firewall Performance Tuning
+  ✓ Network Services Optimization
+  ✓ ARP Cache Cleared
+  ✓ DNS Cache Flushed & Re-registered
+  ✓ SMB Performance Enhanced
+  ✓ BITS Transfer Optimization
+  ✓ MMCSS Priority Configured
+
+FILES CREATED:
+─────────────────────────────────────────────────────────────────
+  Backup:                  F:\study\Platforms\windows\netboost\NetworkBackup_20251222_190742.json
+  Log:                     F:\study\Platforms\windows\netboost\NetworkOptimization_20251222_190742.log
+
+NEXT STEPS:
+─────────────────────────────────────────────────────────────────
+  1. Test your network speed using: speedtest
+  2. Compare results with your previous test
+  3. Expected improvements:
+     - Significantly faster download/upload speeds
+     - Lower latency and jitter
+     - More stable connection
+     - Better multi-device performance
+
+  4. If you encounter any issues, restore from backup:
+     - Backup file location: F:\study\Platforms\windows\netboost\NetworkBackup_20251222_190742.json
+
+IMPORTANT NOTES:
+─────────────────────────────────────────────────────────────────
+  • All optimizations are ACTIVE immediately (no reboot required)
+  • Your connection was NOT disconnected during optimization
+  • Settings are persistent across reboots
+  • To revert changes, use the backup file created
+  • Some optimizations may take 1-2 minutes to fully stabilize
+
+RECOMMENDED:
+─────────────────────────────────────────────────────────────────
+  • Run a speed test NOW to see immediate improvements
+  • Monitor connection stability for 24 hours
+  • Keep the backup file for at least 30 days
+  • Re-run this script monthly for optimal performance
+
+╔══════════════════════════════════════════════════════════════════╗
+║  Your WiFi/Network has been optimized for MAXIMUM PERFORMANCE!   ║
+║                                                                  ║
+║  Enjoy your significantly faster internet connection! 🚀          ║
+╚══════════════════════════════════════════════════════════════════╝
+
+[2025-12-22 19:07:57] [Success] Optimization script completed successfully!
+[2025-12-22 19:07:57] [Info] Please run 'speedtest' to verify your improved network performance
+[2025-12-22 19:07:57] [Info] Current time: 2025-12-22 19:07:57

@@ -1,0 +1,112 @@
+=================================================================
+                WINPE & WINRE AUTO-SETUP ONE-LINER
+=================================================================
+
+PURPOSE:
+--------
+Automatically download, install, and configure Windows Preinstallation Environment (WinPE)
+and Windows Recovery Environment (WinRE) on your system. This is essential for system
+recovery, deployment, and troubleshooting capabilities.
+
+WHAT THIS ONE-LINER DOES:
+--------------------------
+1. CHECK FOR ADK WINPE IMAGE
+   - Looks for: C:\Program Files (x86)\Windows Kits\10\Assessment and Deployment Kit\Windows Preinstallation Environment\amd64\en-us\winpe.wim
+   - If missing → Downloads and installs Windows ADK + WinPE addon
+
+2. DOWNLOAD & INSTALL ADK (if needed)
+   - Downloads ADK Setup from Microsoft: https://go.microsoft.com/fwlink/?linkid=2271337
+   - Downloads WinPE Addon Setup: https://go.microsoft.com/fwlink/?linkid=2271338
+   - Installs ADK with DeploymentTools feature
+   - Installs WinPE addon with WindowsPreinstallationEnvironment feature
+   - Both run silently (/quiet /norestart)
+
+3. RESTORE WINRE (if missing)
+   - Target: C:\Windows\System32\Recovery\Winre.wim
+   - Source: ADK WinPE image (winpe.wim)
+   - If WinRE image is missing, it copies the WinPE base image to restore recovery capability
+
+4. ENABLE WINRE (if disabled)
+   - Checks recovery status with: reagentc /info
+   - If disabled → Runs: reagentc /enable
+   - Enables Windows Recovery Environment for boot-time troubleshooting
+
+TECHNICAL DETAILS:
+------------------
+- ADK version: Windows 10 ADK (latest from Microsoft links)
+- WinPE architecture: amd64 (x64)
+- Installation features: DeploymentTools + WindowsPreinstallationEnvironment
+- Silent install flags: /quiet /norestart /ceip off
+- Recovery agent: reagentc.exe (Windows Recovery Agent Command)
+
+WHY YOU NEED THIS:
+------------------
+✓ System recovery capability (Advanced Startup, System Restore, etc.)
+✓ Deployment tools for Windows imaging
+✓ Troubleshooting boot issues
+✓ Creating custom recovery environments
+✓ System repair and diagnostics
+
+REQUIREMENTS:
+-------------
+- Windows 10/11
+- Administrator privileges
+- Internet connection (for ADK download, ~500MB+)
+- Disk space: ~2-3GB for ADK installation
+
+USAGE:
+------
+Run the PowerShell function: gwinpe
+
+Or run the one-liner directly (see below).
+
+=================================================================
+                         ONE-LINER CODE
+=================================================================
+
+$adkWim = "C:\Program Files (x86)\Windows Kits\10\Assessment and Deployment Kit\Windows Preinstallation Environment\amd64\en-us\winpe.wim"; $targetWim = "C:\Windows\System32\Recovery\Winre.wim"; if (!(Test-Path $adkWim)) { Write-Host "Installing ADK+WinPE..." -ForegroundColor Cyan; [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest "https://go.microsoft.com/fwlink/?linkid=2271337" -OutFile "$env:TEMP\adksetup.exe"; Invoke-WebRequest "https://go.microsoft.com/fwlink/?linkid=2271338" -OutFile "$env:TEMP\adkwinpesetup.exe"; Start-Process "$env:TEMP\adksetup.exe" -ArgumentList "/features OptionId.DeploymentTools /quiet /norestart /ceip off" -Wait; Start-Process "$env:TEMP\adkwinpesetup.exe" -ArgumentList "/features OptionId.WindowsPreinstallationEnvironment /quiet /norestart /ceip off" -Wait }; if (!(Test-Path $targetWim)) { Write-Host "Restoring WinRE..." -ForegroundColor Cyan; Copy-Item $adkWim $targetWim -Force }; $re = reagentc /info 2>&1 | Out-String; if ($re -match "Disabled") { Write-Host "Enabling WinRE..." -ForegroundColor Cyan; reagentc /enable }; Write-Host "=== WinPE setup complete ===" -ForegroundColor Green
+
+=================================================================
+                      POWERSHELL FUNCTION
+=================================================================
+
+Add this to your PowerShell profile for easy access:
+
+function gwinpe {
+    $adkWim = "C:\Program Files (x86)\Windows Kits\10\Assessment and Deployment Kit\Windows Preinstallation Environment\amd64\en-us\winpe.wim"
+    $targetWim = "C:\Windows\System32\Recovery\Winre.wim"
+    
+    if (!(Test-Path $adkWim)) {
+        Write-Host "Installing ADK+WinPE..." -ForegroundColor Cyan
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        Invoke-WebRequest "https://go.microsoft.com/fwlink/?linkid=2271337" -OutFile "$env:TEMP\adksetup.exe"
+        Invoke-WebRequest "https://go.microsoft.com/fwlink/?linkid=2271338" -OutFile "$env:TEMP\adkwinpesetup.exe"
+        Start-Process "$env:TEMP\adksetup.exe" -ArgumentList "/features OptionId.DeploymentTools /quiet /norestart /ceip off" -Wait
+        Start-Process "$env:TEMP\adkwinpesetup.exe" -ArgumentList "/features OptionId.WindowsPreinstallationEnvironment /quiet /norestart /ceip off" -Wait
+    }
+    
+    if (!(Test-Path $targetWim)) {
+        Write-Host "Restoring WinRE..." -ForegroundColor Cyan
+        Copy-Item $adkWim $targetWim -Force
+    }
+    
+    $re = reagentc /info 2>&1 | Out-String
+    if ($re -match "Disabled") {
+        Write-Host "Enabling WinRE..." -ForegroundColor Cyan
+        reagentc /enable
+    }
+    
+    Write-Host "=== WinPE setup complete ===" -ForegroundColor Green
+}
+
+=================================================================
+                        CREATED BY
+=================================================================
+Date: 2026-03-11
+Location: F:\study\Platforms\windows\troubleshooting\fixwim\winpe-winre-setup
+Depth: 7 (exceeds requirement of layer 6+)
+
+Path breakdown:
+F:\study (1) → Platforms (2) → windows (3) → troubleshooting (4) → fixwim (5) → winpe-winre-setup (6) → [files here] (7)
+
+=================================================================
