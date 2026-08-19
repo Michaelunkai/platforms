@@ -29,6 +29,7 @@ function glm52oc {
     [CmdletBinding()]
     param(
         [switch]$Check,
+        [switch]$Wait,  # Wait for GLM-5.2 if rate-limited (like nvioc -m behavior)
         [Parameter(ValueFromRemainingArguments = $true)][string[]]$Args
     )
 
@@ -390,9 +391,11 @@ function glm52oc {
             Write-Host "OC_PROGRESS stage=model-selected model=$finalModelArg label=$finalLabel"
         }
     } else {
-        # INSTANT PATH - NO WAIT LOOPS, NO "RETRYING" ERRORS
+        # INSTANT PATH - NO WAIT LOOPS (unless -Wait for GLM-5.2 default)
         Clear-StaleOpenCode
         Backup-OpenCodeSessions
+
+        $isDefaultModel = ($finalModelArg -eq $defaultModel)
 
         # Single probe for chosen model (cache-aware, instant if fresh)
         $launchModel = $null
@@ -404,7 +407,29 @@ function glm52oc {
             Write-Host "OC_PROGRESS stage=preflight-skip model=$finalModelArg status=$($probe.status) source=$($probe.source) (rate-limited or unavailable)"
         }
 
-        # If explicitly requested model is throttled, try fallbacks ONCE (no wait loop)
+        # If -Wait flag and using default GLM-5.2, wait for rate limit to clear (like nvioc -m behavior)
+        if (-not $launchModel -and $Wait -and $isDefaultModel) {
+            Write-Host "OC_PROGRESS stage=preflight-wait model=$finalModelArg (waiting for rate limit to clear, up to 90s)"
+            $deadline = (Get-Date).AddSeconds(90)
+            $attempt = 0
+            while ((Get-Date) -lt $deadline) {
+                Start-Sleep -Seconds 10
+                $attempt++
+                $probe = Test-ModelCached -ModelId $finalModelArg -ApiKey $nvidiaApiKey -OkTtlSec 5 -ThrottledRetrySec 5
+                if ($probe.ok) {
+                    Write-Host "OC_PROGRESS stage=preflight-ok model=$finalModelArg label=$finalLabel (after wait)"
+                    $launchModel = $finalModelArg
+                    break
+                } else {
+                    Write-Host "OC_PROGRESS stage=preflight-wait-retry model=$finalModelArg status=$($probe.status) attempt=$attempt"
+                }
+            }
+            if (-not $launchModel) {
+                Write-Host "OC_PROGRESS stage=preflight-wait-expired model=$finalModelArg (still rate-limited after 90s, falling back)"
+            }
+        }
+
+        # If still no launch model, try fallbacks ONCE (no wait loop)
         if (-not $launchModel) {
             foreach ($testId in $modelOrder) {
                 if ($testId -eq $finalModelArg) { continue }
@@ -672,16 +697,21 @@ how it was verified.
 
 if ($MyInvocation.InvocationName -ne '.') {
     $__checkSwitch = $false
+    $__waitSwitch = $false
     $__passArgs = @()
     foreach ($__a in $args) {
         if ($__a -eq '-Check' -or $__a -eq '-check') {
             $__checkSwitch = $true
+        } elseif ($__a -eq '-Wait' -or $__a -eq '-wait') {
+            $__waitSwitch = $true
         } else {
             $__passArgs += $__a
         }
     }
     if ($__checkSwitch) {
         & 'glm52oc' -Check @__passArgs
+    } elseif ($__waitSwitch) {
+        & 'glm52oc' -Wait @__passArgs
     } else {
         & 'glm52oc' @__passArgs
     }
