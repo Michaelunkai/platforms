@@ -1,0 +1,31 @@
+# Python caches/build outputs
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.venv/
+venv/
+build/
+dist/
+*.egg-info/
+
+# Local env/secrets/cookies
+.env
+.env.*
+*.sqlite
+Cookies
+Local State
+*.cookie*
+*.token
+
+# Logs/temp
+*.log
+*.tmp
+*.bak
+
+# OS/editor
+.DS_Store
+Thumbs.db
+Desktop.ini
+.vscode/
+.idea/
