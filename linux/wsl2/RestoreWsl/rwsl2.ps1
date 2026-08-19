@@ -22,7 +22,7 @@ function rwsl2 {
         $wslExe = Join-Path $env:SystemRoot 'System32\wsl.exe'
         & $wslExe -d $Distribution @Arguments
     } finally {
-        Write-Progress -Id $progressId -Completed
+        Write-Progress -Id $progressId -Activity 'WSL restore and open' -Completed
     }
 }
 

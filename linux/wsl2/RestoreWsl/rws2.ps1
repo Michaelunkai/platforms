@@ -66,7 +66,7 @@ function rws2 {
             }
             Write-Host "RWS2_OK distribution='$Distribution' root='$InstallRoot' archive='$ArchivePath'" -ForegroundColor Green
         } finally {
-            Write-Progress -Id $progressId -Completed
+            Write-Progress -Id $progressId -Activity 'WSL restore' -Completed
         }
     } finally {
         $ConfirmPreference = $previousConfirmPreference

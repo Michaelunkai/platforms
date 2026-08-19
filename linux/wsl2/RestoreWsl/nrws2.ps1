@@ -48,7 +48,7 @@ function nrws2 {
             if (-not (Test-Path -LiteralPath $ArchivePath -PathType Leaf)) { throw "WSL export did not produce an archive: $ArchivePath" }
             Write-Host "NRWS2_OK distribution='$Distribution' archive='$ArchivePath'" -ForegroundColor Green
         } finally {
-            Write-Progress -Id $progressId -Completed
+            Write-Progress -Id $progressId -Activity 'WSL export' -Completed
         }
     } finally {
         $ConfirmPreference = $previousConfirmPreference

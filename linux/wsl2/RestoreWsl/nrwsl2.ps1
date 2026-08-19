@@ -22,7 +22,7 @@ function nrwsl2 {
         Write-Progress -Id $progressId -Activity 'WSL export then restore and open' -Status 'Restoring distribution' -PercentComplete 45
         rwsl2 -Distribution $Distribution -InstallRoot $InstallRoot -ArchivePath $ArchivePath -Force @Arguments
     } finally {
-        Write-Progress -Id $progressId -Completed
+        Write-Progress -Id $progressId -Activity 'WSL export then restore and open' -Completed
     }
 }
 
