@@ -1,11 +1,11 @@
-# Exports (syncs) the current WSL distribution to the localai archive first,
+# Exports (syncs) the current distribution to the fast VHD archive first,
 # then restores and opens it (same as rwsl2, but with an export up front).
 function nrwsl2 {
 [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'None')]
     param(
         [string] $Distribution = 'localai',
         [string] $InstallRoot = 'C:\wsl2\localai',
-        [string] $ArchivePath = 'F:\backup\linux\wsl\localai.tar',
+        [string] $ArchivePath = 'F:\backup\linux\wsl\localai.vhd',
         [switch] $Force,
         [Parameter(ValueFromRemainingArguments = $true)]
         [object[]] $Arguments
@@ -15,15 +15,8 @@ function nrwsl2 {
         return
     }
 
-    $progressId = 7562
-    try {
-        Write-Progress -Id $progressId -Activity 'WSL export then restore and open' -Status 'Exporting current state' -PercentComplete 5
-        nrws2 -Distribution $Distribution -ArchivePath $ArchivePath -Force
-        Write-Progress -Id $progressId -Activity 'WSL export then restore and open' -Status 'Restoring distribution' -PercentComplete 45
-        rwsl2 -Distribution $Distribution -InstallRoot $InstallRoot -ArchivePath $ArchivePath -Force @Arguments
-    } finally {
-        Write-Progress -Id $progressId -Activity 'WSL export then restore and open' -Completed
-    }
+    nrws2 -Distribution $Distribution -ArchivePath $ArchivePath -Force
+    rwsl2 -Distribution $Distribution -InstallRoot $InstallRoot -ArchivePath $ArchivePath -Force @Arguments
 }
 
 if ($MyInvocation.InvocationName -ne '.') {

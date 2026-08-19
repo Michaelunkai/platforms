@@ -1,10 +1,11 @@
-# Exports (syncs) the current WSL distribution to the localai archive,
-# deleting the older localai.tar and replacing it with a fresh export.
+# Exports (syncs) the current localai distribution to the fast VHD archive,
+# deleting the older archive (and any stale localai.tar) and replacing it.
+# (A .tar archive is also supported when the path ends in .tar.)
 function nrws2 {
 [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'None')]
     param(
         [string] $Distribution = 'localai',
-        [string] $ArchivePath = 'F:\backup\linux\wsl\localai.tar',
+        [string] $ArchivePath = 'F:\backup\linux\wsl\localai.vhd',
         [switch] $Force
     )
 
@@ -22,34 +23,37 @@ function nrws2 {
             return
         }
 
-        $progressId = 7552
-        try {
-            Write-Progress -Id $progressId -Activity 'WSL export' -Status 'Inspecting registered distributions' -PercentComplete 10
-            $registered = @(
-                & $wsl --list --quiet | ForEach-Object {
-                    (([string] $_) -replace [string][char]0, '').Trim()
-                } | Where-Object { $_ }
-            )
-            if ($LASTEXITCODE -ne 0) { throw "WSL distribution inventory failed with exit code $LASTEXITCODE." }
-            if ($registered -notcontains $Distribution) {
-                throw "WSL distribution '$Distribution' is not registered - nothing to export."
-            }
-
-            if (Test-Path -LiteralPath $ArchivePath) {
-                Write-Progress -Id $progressId -Activity 'WSL export' -Status "Removing older archive '$ArchivePath'" -PercentComplete 35
-                Remove-Item -LiteralPath $ArchivePath -Force -ErrorAction Stop
-            }
-            $parent = Split-Path -Parent $ArchivePath
-            if (-not (Test-Path -LiteralPath $parent -PathType Container)) { New-Item -ItemType Directory -Path $parent -Force -ErrorAction Stop | Out-Null }
-
-            Write-Progress -Id $progressId -Activity 'WSL export' -Status "Exporting '$Distribution' to '$ArchivePath'" -PercentComplete 60
-            & $wsl --export $Distribution $ArchivePath
-            if ($LASTEXITCODE -ne 0) { throw "WSL export failed with exit code $LASTEXITCODE." }
-            if (-not (Test-Path -LiteralPath $ArchivePath -PathType Leaf)) { throw "WSL export did not produce an archive: $ArchivePath" }
-            Write-Host "NRWS2_OK distribution='$Distribution' archive='$ArchivePath'" -ForegroundColor Green
-        } finally {
-            Write-Progress -Id $progressId -Activity 'WSL export' -Completed
+        $registered = @(
+            & $wsl --list --quiet | ForEach-Object {
+                (([string] $_) -replace [string][char]0, '').Trim()
+            } | Where-Object { $_ }
+        )
+        if ($LASTEXITCODE -ne 0) { throw "WSL distribution inventory failed with exit code $LASTEXITCODE." }
+        if ($registered -notcontains $Distribution) {
+            throw "WSL distribution '$Distribution' is not registered - nothing to export."
         }
+
+        if (Test-Path -LiteralPath $ArchivePath) {
+            Remove-Item -LiteralPath $ArchivePath -Force -ErrorAction Stop
+        }
+        if ($ArchivePath -match '\.vhd(?:x)?$') {
+            $staleTar = Join-Path (Split-Path -Parent $ArchivePath) 'localai.tar'
+            if (Test-Path -LiteralPath $staleTar) {
+                Remove-Item -LiteralPath $staleTar -Force -ErrorAction Stop
+            }
+        }
+        $parent = Split-Path -Parent $ArchivePath
+        if (-not (Test-Path -LiteralPath $parent -PathType Container)) { New-Item -ItemType Directory -Path $parent -Force -ErrorAction Stop | Out-Null }
+
+        if ($ArchivePath -match '\.vhd(?:x)?$') {
+            & $wsl --export $Distribution $ArchivePath --vhd
+        } else {
+            & $wsl --export $Distribution $ArchivePath
+        }
+        if ($LASTEXITCODE -ne 0) { throw "WSL export failed with exit code $LASTEXITCODE." }
+        if (-not (Test-Path -LiteralPath $ArchivePath -PathType Leaf)) { throw "WSL export did not produce an archive: $ArchivePath" }
+
+        Write-Host "NRWS2_OK distribution='$Distribution' archive='$ArchivePath'" -ForegroundColor Green
     } finally {
         $ConfirmPreference = $previousConfirmPreference
     }
