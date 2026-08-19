@@ -1,0 +1,7 @@
+start
+hwnd=70782450
+hung=1
+minMax=-1
+BEFORE WinRestore
+AFTER WinRestore
+BEFORE WinMove
