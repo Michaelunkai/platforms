@@ -1,0 +1,5 @@
+
+# Auto-excluded large files (>95MB)
+collected/Devops.7z
+collected/projects.7z
+collected/Systems.7z
