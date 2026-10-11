@@ -10,6 +10,13 @@ SetControlDelay(-1)
 SetKeyDelay(-1, -1)
 SetMouseDelay(-1)
 SendMode("Input")
+; Gaming input storms can exceed the defaults (70 activations per 2000 ms);
+; when that happens AutoHotkey raises a blocking warning dialog and stops
+; servicing the keyboard hook, leaving every shortcut dead behind a fullscreen
+; game until the script is reloaded. Raise the ceiling far beyond anything
+; real input can produce so that failure mode can never trigger again.
+A_HotkeyInterval := 1000
+A_MaxHotkeysPerInterval := 500
 ; Thread("Interrupt", 0) let ONE long-running hotkey thread (bulk window moves,
 ; fullscreen recovery, Paragon waits) block every other shortcut and stall the
 ; #SingleInstance-exit message, so reloads left zombie instances that
@@ -49,6 +56,9 @@ global sttGuardSuspended := false
 global sttGuardResumeAt := 0
 SetTimer(SttGuardTick, 25)
 OnExit(SttGuardOnExit)
+; Detect a silently-dropped keyboard hook and heal it automatically (functions
+; at file end); the F24 probe hotkey is the canary it watches.
+SetTimer(HookWatchdogTick, 5000)
 SetTimer(InitializeGameLaunchMonitorEnforcer, -1)
 
 global knownGameLaunchWindows := Map()
@@ -2524,19 +2534,21 @@ global kkkkTapWindow := 1500        ; 4 distinct k presses must complete under 1
     ; launch cannot toggle dictation by mistake.
     SttGuardSuspendForWinChord()
     ; Wand is single-instance and a second launch can toggle its existing
-    ; Electron window hidden. Raise a visible instance above every other app,
-    ; including fullscreen games, instead of launching a second copy; only
-    ; invoke the launcher when no usable window currently exists.
+    ; Electron window hidden. Raise a visible instance fullscreen on the
+    ; primary monitor above every other app instead of launching a second
+    ; copy; only invoke the launcher when no usable window currently exists.
     for hwnd in WinGetList("ahk_exe Wand.exe") {
         try {
             if (WinGetTitle("ahk_id " hwnd) = "")
                 continue
             WinShow("ahk_id " hwnd)
             ForceForegroundApplicationWindow(hwnd)
+            FullscreenAppOnPrimarySticky("Wand.exe", 8000, ProcessExist("Wand.exe"))
             return
         }
     }
-    Run('"C:\Users\Admin\AppData\Local\Wand\Wand.exe"')
+    Run('"C:\Users\Admin\AppData\Local\Wand\Wand.exe"', , , &wandPid)
+    FullscreenAppOnPrimarySticky("Wand.exe", 20000, wandPid)
 }
 
 FindTvMonitor() {
@@ -2777,7 +2789,8 @@ CheckSpaceLongPress() {
 }
 
 ; Ctrl+` - Swap ALL windows between monitors (everything on main â†’ 2nd and 2nd â†’ main)
-; Preserves maximized state and scales proportional positions for non-maximized windows
+; Every swapped window becomes borderless fullscreen covering its target
+; monitor (taskbar included); minimized windows stay minimized.
 ; SC029 = scan code for backtick/grave accent key â€” needed because ` is AHK v2 escape char
 ^SC029::
 {
@@ -2797,24 +2810,31 @@ CheckSpaceLongPress() {
 
     totalMoved := 0
     totalFailed := 0
+    totalFullscreen := 0
 
     ; Move all primary windows to secondary.
     for hwnd in primaryWindows {
-        if MoveWindowScaledBetweenMonitors(hwnd, primaryMon, secondaryMon)
-            totalMoved++
-        else
+        if !MoveWindowScaledBetweenMonitors(hwnd, primaryMon, secondaryMon) {
             totalFailed++
+            continue
+        }
+        totalMoved++
+        if (WinGetMinMax("ahk_id " hwnd) != -1 && MakeFullscreenOnMonitor(hwnd, secondaryMon))
+            totalFullscreen++
     }
 
     ; Move all secondary windows to primary.
     for hwnd in secondaryWindows {
-        if MoveWindowScaledBetweenMonitors(hwnd, secondaryMon, primaryMon)
-            totalMoved++
-        else
+        if !MoveWindowScaledBetweenMonitors(hwnd, secondaryMon, primaryMon) {
             totalFailed++
+            continue
+        }
+        totalMoved++
+        if (WinGetMinMax("ahk_id " hwnd) != -1 && MakeFullscreenOnMonitor(hwnd, primaryMon))
+            totalFullscreen++
     }
 
-    message := "Swapped " totalMoved " window(s) between connected physical monitors"
+    message := "Swapped " totalMoved " window(s) - " totalFullscreen " fullscreen"
     if totalFailed
         message .= " (" totalFailed " failed)"
     ToolTip(message)
@@ -3647,7 +3667,7 @@ TrackKkkkForceKill()
 
 OpenRebootlessPerformanceMaximizer()
 {
-    Run('"F:\study\Platforms\windows\system\maintenance\performance\rebootless\refresh\tools\MichRebootlessWindowsPerformanceMaximizer\app\MichRebootlessWindowsPerformanceMaximizer.exe"')
+    OpenOrForegroundApplication("F:\study\Platforms\windows\system\maintenance\performance\rebootless\refresh\tools\MichRebootlessWindowsPerformanceMaximizer\app\MichRebootlessWindowsPerformanceMaximizer.exe")
 }
 
 OpenFirefox()
@@ -3664,7 +3684,8 @@ OpenFirefox()
     for p in paths {
         if FileExist(p) {
             try {
-                Run(p)
+                Run(p, , , &ffPid)
+                FullscreenAppOnPrimarySticky("firefox.exe", 15000, ffPid, "Firefox")
                 return true
             } catch {
             }
@@ -3679,7 +3700,8 @@ OpenFirefox()
         try {
             regPath := Trim(RegRead(regKey), '"')
             if FileExist(regPath) {
-                Run(regPath)
+                Run(regPath, , , &ffPid)
+                FullscreenAppOnPrimarySticky("firefox.exe", 15000, ffPid, "Firefox")
                 return true
             }
         } catch {
@@ -3697,7 +3719,7 @@ OpenFirefox()
     return false
 }
 
-RunApplication(executablePath, arguments := "")
+RunApplication(executablePath, arguments := "", &launchedPid := 0)
 {
     if !FileExist(executablePath)
         return false
@@ -3708,7 +3730,7 @@ RunApplication(executablePath, arguments := "")
         command .= " " arguments
 
     try {
-        Run(command, workingDirectory)
+        Run(command, workingDirectory, , &launchedPid)
         return true
     } catch {
         return false
@@ -3726,11 +3748,26 @@ RunFirstAvailable(paths, arguments := "")
 
 OpenNamedApplication(name, paths, arguments := "")
 {
-    if RunFirstAvailable(paths, arguments)
-        return true
+    launchedPath := ""
+    launchedPid := 0
+    for path in paths {
+        if RunApplication(path, arguments, &launchedPid) {
+            launchedPath := path
+            break
+        }
+    }
+    if (launchedPath = "") {
+        MsgBox(name " was not found or could not be launched.", "Shortcut error", "Icon!")
+        return false
+    }
 
-    MsgBox(name " was not found or could not be launched.", "Shortcut error", "Icon!")
-    return false
+    ; Raise the app fullscreen on the primary monitor whether it was freshly
+    ; launched or already running; the sticky re-apply beats slow cold starts,
+    ; apps restoring their own bounds after creation, and launchers whose real
+    ; window lives in a differently-named runtime process.
+    SplitPath(launchedPath, &processName)
+    FullscreenAppOnPrimarySticky(processName, 20000, launchedPid)
+    return true
 }
 
 OpenAdminDefaultTerminal()
@@ -3744,6 +3781,9 @@ OpenAdminDefaultTerminal()
         : "wt.exe -w 0 nt"
     try {
         Run(command)
+        ; Raise the terminal window fullscreen on the primary monitor above
+        ; everything; wt reuses an existing window when one exists.
+        FullscreenAppOnPrimarySticky("WindowsTerminal.exe", 12000, 0, "Windows Terminal")
         return true
     } catch as err {
         MsgBox("Windows Terminal could not be started: " err.Message, "Shortcut error", "Icon!")
@@ -3891,6 +3931,153 @@ ForceForegroundApplicationWindow(hwnd)
     return activated
 }
 
+; Wait for an app's window, force it fullscreen on the primary monitor above
+; everything, and RE-APPLY until the geometry verifiably sticks: freshly
+; launched apps (Electron in particular) restore their own saved window bounds
+; shortly after creation, which would silently undo a single early placement,
+; and cold starts can take longer than any single fixed wait. Window lookup is
+; three-tier because launchers often spawn a differently-named runtime that
+; owns the real window (Daymark.exe -> "Daymark Runtime.exe").
+FullscreenAppOnPrimarySticky(processName, deadlineMs := 15000, rootPid := 0, titleHint := "")
+{
+    deadline := A_TickCount + deadlineMs
+    while (A_TickCount < deadline) {
+        hwnd := FindAppWindowForLaunch(processName, rootPid, titleHint)
+        if (hwnd) {
+            ForceForegroundApplicationWindow(hwnd)
+            MakeFullscreenPrimaryTopmost(hwnd)
+            Sleep(700)
+            hwnd2 := FindAppWindowForLaunch(processName, rootPid, titleHint)
+            MonitorGet(MonitorGetPrimary(), &monLeft, &monTop, &monRight, &monBottom)
+            WinGetPos(&winX, &winY, &winW, &winH, "ahk_id " hwnd2)
+            if (hwnd2 && hwnd2 = hwnd
+                && winX = monLeft && winY = monTop
+                && winW = monRight - monLeft && winH = monBottom - monTop
+                && (WinGetExStyle("ahk_id " hwnd2) & 0x8))
+                return true
+        }
+        Sleep(200)
+    }
+    return false
+}
+
+; Resolve an app's window for a keybind launch: exact process exe, then any
+; visible named window whose process starts with the exe's base name, then a
+; window whose title contains the hint (UWP frames are hosted by
+; ApplicationFrameHost, so only the title identifies them), then a descendant
+; of the process that was actually launched.
+FindAppWindowForLaunch(processName, rootPid, titleHint := "")
+{
+    hwnd := FindApplicationWindow(processName)
+    if (hwnd)
+        return hwnd
+    SplitPath(processName, , , , &baseName)
+    hwnd := FindWindowByProcessPrefix(baseName)
+    if (hwnd)
+        return hwnd
+    if (titleHint != "") {
+        hwnd := FindWindowByTitle(titleHint)
+        if (hwnd)
+            return hwnd
+    }
+    if (rootPid)
+        return FindDescendantWindow(rootPid)
+    return 0
+}
+
+FindWindowByTitle(titleHint)
+{
+    hintLower := StrLower(Trim(titleHint))
+    if (hintLower = "")
+        return 0
+    for hwnd in WinGetList() {
+        try {
+            if !DllCall("IsWindowVisible", "Ptr", hwnd, "Int")
+                continue
+            title := WinGetTitle("ahk_id " hwnd)
+            if (title = "")
+                continue
+            cls := WinGetClass("ahk_id " hwnd)
+            if (cls = "Shell_TrayWnd" || cls = "Shell_SecondaryTrayWnd" || cls = "Progman" || cls = "WorkerW" || cls = "Windows.UI.Core.CoreWindow")
+                continue
+            ; Browser window titles embed tab text; never steal a browser for
+            ; an app title match.
+            exeName := StrLower(WinGetProcessName("ahk_id " hwnd))
+            if (exeName = "chrome.exe" || exeName = "firefox.exe" || exeName = "msedge.exe" || exeName = "opera.exe" || exeName = "brave.exe")
+                continue
+            if (InStr(StrLower(title), hintLower))
+                return hwnd
+        }
+    }
+    return 0
+}
+
+FindWindowByProcessPrefix(baseName)
+{
+    baseLower := StrLower(Trim(baseName))
+    if (baseLower = "")
+        return 0
+    for hwnd in WinGetList() {
+        try {
+            if !DllCall("IsWindowVisible", "Ptr", hwnd, "Int")
+                continue
+            if (WinGetTitle("ahk_id " hwnd) = "")
+                continue
+            exeName := StrLower(WinGetProcessName("ahk_id " hwnd))
+            if (SubStr(exeName, 1, StrLen(baseLower)) = baseLower)
+                return hwnd
+        }
+    }
+    return 0
+}
+
+FindDescendantWindow(rootPid)
+{
+    for hwnd in WinGetList() {
+        try {
+            if !DllCall("IsWindowVisible", "Ptr", hwnd, "Int")
+                continue
+            if (WinGetTitle("ahk_id " hwnd) = "")
+                continue
+            winPid := WinGetPID("ahk_id " hwnd)
+            if (winPid && IsProcessDescendantOf(winPid, rootPid))
+                return hwnd
+        }
+    }
+    return 0
+}
+
+IsProcessDescendantOf(pid, ancestorPid)
+{
+    if (pid = ancestorPid)
+        return true
+    snapshot := DllCall("CreateToolhelp32Snapshot", "UInt", 0x2, "UInt", 0, "Ptr")
+    if (!snapshot || snapshot = -1)
+        return false
+    parentOf := Map()
+    entry := Buffer(568, 0)
+    NumPut("UInt", 568, entry, 0)
+    if DllCall("Process32FirstW", "Ptr", snapshot, "Ptr", entry, "Int") {
+        loop {
+            parentOf[NumGet(entry, 8, "UInt")] := NumGet(entry, 32, "UInt") ; pid -> parentPid
+            if !DllCall("Process32NextW", "Ptr", snapshot, "Ptr", entry, "Int")
+                break
+        }
+    }
+    DllCall("CloseHandle", "Ptr", snapshot)
+    walker := pid
+    loop 32 {
+        if (!parentOf.Has(walker))
+            return false
+        walker := parentOf[walker]
+        if (walker = ancestorPid)
+            return true
+        if (!walker)
+            return false
+    }
+    return false
+}
+
 OpenOrActivateApplication(executablePath, processName, displayName)
 {
     if !FileExist(executablePath) {
@@ -3898,26 +4085,22 @@ OpenOrActivateApplication(executablePath, processName, displayName)
         return false
     }
 
-    hwnd := FindApplicationWindow(processName)
-    if (hwnd && ForceForegroundApplicationWindow(hwnd))
+    ; Already running: raise it fullscreen on the primary monitor.
+    runningPid := ProcessExist(processName)
+    if (runningPid) {
+        FullscreenAppOnPrimarySticky(processName, 8000, runningPid)
         return true
+    }
 
-    try Run('"' executablePath '"')
+    try Run('"' executablePath '"', , , &launchPid)
     catch as err {
         ShowCommandStatus(displayName ": launch failed - " err.Message, 3000)
         return false
     }
 
-    deadline := A_TickCount + 10000
-    while (A_TickCount < deadline) {
-        hwnd := FindApplicationWindow(processName)
-        if (hwnd && ForceForegroundApplicationWindow(hwnd))
-            return true
-        Sleep(50)
-    }
-
-    ShowCommandStatus(displayName ": no usable window appeared", 3000)
-    return false
+    if !FullscreenAppOnPrimarySticky(processName, 20000, launchPid)
+        ShowCommandStatus(displayName ": no usable window appeared", 3000)
+    return true
 }
 
 ; Launch an app, or when it already runs, force its window above every other
@@ -3926,6 +4109,42 @@ OpenOrForegroundApplication(executablePath)
 {
     SplitPath(executablePath, &processName)
     return OpenOrActivateApplication(executablePath, processName, processName)
+}
+
+; Force a window into borderless fullscreen covering the ENTIRE given monitor
+; (taskbar included). Re-applying is idempotent.
+MakeFullscreenOnMonitor(hwnd, targetMonitor)
+{
+    if (!hwnd || !WinExist("ahk_id " hwnd))
+        return false
+    ; A maximized window must be restored first or the move fights the
+    ; maximized state and Windows re-snaps it to its old geometry.
+    try {
+        if (WinGetMinMax("ahk_id " hwnd) != 0)
+            WinRestore("ahk_id " hwnd)
+    }
+    ; Strip the caption and resizable frame so only app content covers the
+    ; screen; re-applying is idempotent.
+    try WinSetStyle("-0xC00000", "ahk_id " hwnd) ; WS_CAPTION
+    catch
+        return false
+    try WinSetStyle("-0x40000", "ahk_id " hwnd)  ; WS_THICKFRAME
+    MonitorGet(targetMonitor, &monLeft, &monTop, &monRight, &monBottom)
+    WinMove(monLeft, monTop, monRight - monLeft, monBottom - monTop, "ahk_id " hwnd)
+    return true
+}
+
+; Force a window into borderless fullscreen covering the ENTIRE primary
+; monitor - taskbar included - and pin it above every other window. Applied to
+; every app the keybinds run, whether freshly launched or already open.
+MakeFullscreenPrimaryTopmost(hwnd)
+{
+    if !MakeFullscreenOnMonitor(hwnd, MonitorGetPrimary())
+        return false
+    DllCall("SetWindowPos", "Ptr", hwnd, "Ptr", -1, "Int", 0, "Int", 0, "Int", 0, "Int", 0
+        , "UInt", 0x0001 | 0x0002 | 0x0040) ; NOSIZE | NOMOVE | SHOWWINDOW - HWND_TOPMOST, kept
+    DllCall("SetForegroundWindow", "Ptr", hwnd, "Int")
+    return true
 }
 
 OpenGameLibraryManager()
@@ -4951,7 +5170,7 @@ ForceThreeWaySplit(target) {
 ; rroll - Open RollBack Rx Home
 :*:rroll::
 {
-    Run('"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\RollBack Rx Home\RollBack Rx Home.lnk"')
+    OpenOrForegroundApplication("C:\ProgramData\Microsoft\Windows\Start Menu\Programs\RollBack Rx Home\RollBack Rx Home.lnk")
 }
 
 ; allit - Open Everything search
@@ -5073,12 +5292,14 @@ ForceThreeWaySplit(target) {
 :*:toto::
 {
     Run('cmd /c start shell:AppsFolder\88449BC3.TodoistPlannerCalendarMSIX_71ef4824z52ta!BC3.TodoistPlannerCalendarMSIX', , "Hide")
+    FullscreenAppOnPrimarySticky("Todoist.exe", 15000, 0, "Todoist")
 }
 
 ; sslack - Open Slack (UWP app launched via shell protocol)
 :*:sslack::
 {
     Run('cmd /c start shell:AppsFolder\91750D7E.Slack_8she8kybcnzg4!Slack', , "Hide")
+    FullscreenAppOnPrimarySticky("Slack.exe", 15000, 0, "Slack")
 }
 
 ; pass - Copy password to clipboard
@@ -5179,7 +5400,7 @@ ForceThreeWaySplit(target) {
         ProcessClose("gs_mngr_3.exe")
         Sleep(1000)
     }
-    Run('"F:\backup\windowsapps\installed\gamesavemanager\gs_mngr_3.exe"')
+    OpenOrForegroundApplication("F:\backup\windowsapps\installed\gamesavemanager\gs_mngr_3.exe")
 }
 
 ; rrram - Open RAM Monitor Pro
@@ -5227,7 +5448,7 @@ ForceThreeWaySplit(target) {
 ; mmed - Open the black cinema app in the default browser
 :*:mmed::
 {
-    Run("https://black-cinema-app.vercel.app/")
+    Run("https://black-cinema-app-cinema-runtime.vercel.app/")
 }
 
 ; rrotate - Open Auto IP Changer, or force its window over everything including fullscreen games
@@ -5312,6 +5533,55 @@ ForceThreeWaySplit(target) {
     SetTimer(() => ToolTip(), -4000)
 }
 
+; ttype <command> - Run exactly what you type in default Windows PowerShell 5
+; Type ttype, then the command, then Enter - the capture waits INDEFINITELY
+; (no timeout), so a command can be composed as long and complex as wanted,
+; echoes what it captured live, swallows the keystrokes so nothing leaks into
+; the focused window, Esc cancels. The command is passed base64-encoded so
+; every character (quotes, dollars, braces) arrives exactly as typed, runs
+; fully hidden in powershell.exe (v5) with all output streams captured, and
+; the result opens in a small read-only window.
+:*:ttype::
+{
+    ; No timeout on purpose: the ONLY ways out are Enter (run) or Esc
+    ; (cancel), so a long one-liner can be composed for as long as needed.
+    ih := InputHook("", "{Enter}{Esc}")
+    echo := () => ToolTip("ttype: " ih.Input "   [Enter = run in new PowerShell 5 terminal tab  |  Esc = cancel]")
+    SetTimer(echo, 100)
+    ih.Start()
+    ih.Wait()
+    SetTimer(echo, 0)
+    if (ih.EndReason = "EndKey" && ih.EndKey = "Esc") {
+        ToolTip("ttype cancelled")
+        SetTimer(() => ToolTip(), -1500)
+        return
+    }
+    if (ih.EndReason != "EndKey") {
+        ToolTip()
+        return
+    }
+    command := Trim(ih.Input)
+    if (command = "") {
+        ToolTip("ttype: nothing typed - type a command after ttype, then Enter")
+        SetTimer(() => ToolTip(), -3000)
+        return
+    }
+    ; The EXACT command goes to a temp .ps1 file (UTF-8 with BOM, so PS5 reads
+    ; every character precisely) which opens in a NEW TAB of the default
+    ; terminal via wt, running Windows PowerShell 5 with the user's profile
+    ; loaded (no -NoProfile), so every function they set up is available.
+    ; -NoExit keeps the tab open so all output stays visible afterwards.
+    scriptFile := A_Temp "\ttype-run-" A_TickCount ".ps1"
+    try FileDelete(scriptFile) ; FileAppend appends if a stale file exists
+    FileAppend(command, scriptFile, "UTF-8")
+    q := Chr(34)
+    terminalPath := EnvGet("LOCALAPPDATA") "\Microsoft\WindowsApps\wt.exe"
+    wtExe := FileExist(terminalPath) ? (q terminalPath q) : "wt.exe"
+    Run(wtExe " -w 0 nt powershell.exe -NoExit -ExecutionPolicy Bypass -File " q scriptFile q)
+    ToolTip("ttype: running in new PowerShell 5 terminal tab ...")
+    SetTimer(() => ToolTip(), -2000)
+}
+
 ; ss2t - Force-close OpenWhispr and reopen it
 :*:ss2t::
 {
@@ -5327,7 +5597,7 @@ ForceThreeWaySplit(target) {
 ; wwsl - Open WSL terminal
 :*:wwsl::
 {
-    Run('"C:\Program Files\WSL\wsl.exe"')
+    OpenOrForegroundApplication("C:\Program Files\WSL\wsl.exe")
 }
 
 ; gagaga - Open games folder
@@ -5340,6 +5610,7 @@ ForceThreeWaySplit(target) {
 :*:tetete::
 {
     Run("tg://")
+    FullscreenAppOnPrimarySticky("Telegram.exe", 15000, 0, "Telegram")
 }
 
 ; ============================================================================
@@ -5510,12 +5781,13 @@ GetRecentWindows(count) {
 {
     Run('powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "'
         A_ScriptDir '\Open-NvidiaAppSafely.ps1"', A_ScriptDir, "Hide")
+    FullscreenAppOnPrimarySticky("NVIDIA App.exe", 20000, 0, "NVIDIA App")
 }
 
 ; Hotstring: rryz -> Open AMD Ryzen Master
 :*:rryz::
 {
-    Run("C:\Program Files\AMD\RyzenMaster\bin\AMD Ryzen Master.exe")
+    OpenOrForegroundApplication("C:\Program Files\AMD\RyzenMaster\bin\AMD Ryzen Master.exe")
 }
 
 ; Hotstring: aamd -> Open AMD Ryzen Master
@@ -6517,12 +6789,24 @@ SttGuardSetSuspended(suspend)
 
 SttGuardListenerPids()
 {
+    ; Toolhelp snapshot instead of WMI: this runs on the hotkey thread, and a
+    ; COM/WMI connection setup can stall long enough for Windows to mark the
+    ; low-level keyboard hook unresponsive.
     pids := []
-    try {
-        for process in ComObjGet("winmgmts:").ExecQuery("SELECT ProcessId FROM Win32_Process WHERE Name = 'windows-key-listener.exe'")
-            pids.Push(process.ProcessId)
-    } catch {
+    snapshot := DllCall("CreateToolhelp32Snapshot", "UInt", 0x2, "UInt", 0, "Ptr") ; TH32CS_SNAPPROCESS
+    if (!snapshot || snapshot = -1)
+        return pids
+    entry := Buffer(568, 0) ; PROCESSENTRY32W (x64: 8-byte alignment before the ULONG_PTR member)
+    NumPut("UInt", 568, entry, 0)
+    if DllCall("Process32FirstW", "Ptr", snapshot, "Ptr", entry, "Int") {
+        loop {
+            if (StrCompare(StrGet(entry.Ptr + 44, 260, "UTF-16"), "windows-key-listener.exe") = 0)
+                pids.Push(NumGet(entry, 8, "UInt")) ; th32ProcessID
+            if !DllCall("Process32NextW", "Ptr", snapshot, "Ptr", entry, "Int")
+                break
+        }
     }
+    DllCall("CloseHandle", "Ptr", snapshot)
     return pids
 }
 
@@ -6559,4 +6843,66 @@ SttGuardOnExit(exitReason, exitCode)
     if (sttGuardSuspended)
         SttGuardSetSuspended(false)
     return 0
+}
+
+; ============================================================================
+; KEYBOARD-HOOK WATCHDOG
+; Windows silently stops calling a low-level keyboard hook after callback
+; timeouts, sleep/resume, or secure-desktop switches, which leaves every hook
+; shortcut dead until the script is reloaded. Every 5 seconds the watchdog
+; taps F24 - an unused key the ~*F24 probe hotkey logs - and verifies the
+; probe file grew. Two consecutive dead taps toggle Suspend, which forces
+; AutoHotkey to uninstall and reinstall a fresh keyboard hook; four
+; consecutive dead taps escalate to an automatic reload of the script (the
+; manual fix, performed automatically). Every detection and heal is logged.
+; ============================================================================
+HookWatchdogTick()
+{
+    static deadStrikes := 0
+    if (A_IsSuspended) {
+        deadStrikes := 0
+        return
+    }
+    probeFile := A_Temp "\current-ahk-hook-probe.log"
+    sizeBefore := 0
+    try sizeBefore := FileGetSize(probeFile)
+    ; SendLevel 1 is essential: AHK deliberately makes its own sent input
+    ; invisible to its own hook hotkeys at the default level. SendEvent is
+    ; equally essential: SendInput would uninstall the hook during the send,
+    ; so the canary would bypass the very hook it is testing.
+    SendLevel(1)
+    SendEvent("{F24}")
+    SendLevel(0)
+    Sleep(600)
+    sizeAfter := 0
+    try sizeAfter := FileGetSize(probeFile)
+    if (sizeAfter > 262144) {
+        try FileDelete(probeFile) ; keep the canary log bounded; it recreates
+    }
+    if (sizeAfter > sizeBefore) {
+        deadStrikes := 0
+        return
+    }
+    deadStrikes += 1
+    HookWatchdogLog("dead keyboard-hook probe, strike " deadStrikes)
+    if (deadStrikes = 2) {
+        ; Nothing else in this script uses Suspend, so this toggle is safe:
+        ; disabling the last layer of hook hotkeys uninstalls the keyboard
+        ; hook and re-enabling installs a brand-new one.
+        Suspend(true)
+        Sleep(30)
+        Suspend(false)
+        HookWatchdogLog("keyboard hook reinstalled via suspend toggle")
+    }
+    if (deadStrikes >= 4) {
+        HookWatchdogLog("hook still dead after reinstall - auto-reloading script")
+        deadStrikes := 0
+        Run('"' A_AhkPath '" "' A_ScriptFullPath '"')
+        ExitApp()
+    }
+}
+
+HookWatchdogLog(message)
+{
+    try FileAppend(A_Now " " message "`n", A_Temp "\current-ahk-hook-watchdog.log")
 }
