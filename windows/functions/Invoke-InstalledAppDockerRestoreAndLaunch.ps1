@@ -1,0 +1,846 @@
+[CmdletBinding()]
+param(
+    [Parameter(Mandatory)][string]$Folder,
+    [switch]$SelfTest,
+    [switch]$CatalogOnly
+)
+
+$ErrorActionPreference = 'Stop'
+$script:GMenuPayloadSource = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'GMenuPayload.cs'))
+. (Join-Path $PSScriptRoot 'GMenuRuntime.ps1')
+Initialize-GMenuRuntime
+# Older cached profile wrappers must prefer a successfully registered gmenu backup.
+$gmenuFunctionName='g'+($Folder -replace '[^A-Za-z0-9]','')
+$gmenuStateRoot=if(-not [string]::IsNullOrWhiteSpace([string]$env:GMENU_STATE_ROOT)){
+    [IO.Path]::GetFullPath([string]$env:GMENU_STATE_ROOT)
+}else{
+    if(-not (Test-Path -LiteralPath 'F:\' -PathType Container)){throw 'GMenu durable state requires the F: drive.'}
+    'F:\backup\windowsapps\GMenuState'
+}
+$gmenuCommand=Join-Path $gmenuStateRoot ('Commands\'+$gmenuFunctionName+'.ps1')
+$gmenuReceipt=Join-Path $gmenuStateRoot ('Commands\'+$gmenuFunctionName+'.receipt.json')
+if(-not $SelfTest -and -not $CatalogOnly -and (Test-Path -LiteralPath $gmenuCommand -PathType Leaf) -and (Test-Path -LiteralPath $gmenuReceipt -PathType Leaf)) {
+    $reader=[IO.File]::OpenText($gmenuCommand)
+    try {$generated=$reader.ReadLine() -like '# GMENU GENERATED RESTORE COMMAND*'}finally{$reader.Dispose()}
+    if($generated){& $gmenuCommand @args;return}
+}
+$installRoot = 'F:\backup\windowsapps\installed'
+$catalog = @{
+    'CodexMonitor' = @{ Slug = 'codexmonitor'; Protected = $true; Kind = 'CodexMonitor' }
+    'WhisperKeyLocal' = @{ Slug = 'whisperkeylocal'; Kind = 'PowerShell'; Path = 'Start-WhisperKeyLocal.ps1' }
+    'Whisper' = @{ Slug = 'whisper'; Kind = 'Exe'; Path = 'WhisperSTT.exe'; Process = 'WhisperSTT.exe' }
+    'tv' = @{ Slug = 'tv'; Kind = 'Exe'; Path = 'tizen\moonlight-setup-guardian\bin\MoonlightSetupGuardian.exe'; Process = 'MoonlightSetupGuardian.exe' }
+    'reflect' = @{ Slug = 'reflect'; Protected = $true; Kind = 'Exe'; Path = 'Reflect.exe'; Process = 'Reflect.exe' }
+    'FlareSolverr' = @{ Slug = 'flaresolverr'; Kind = 'HttpScript'; Path = 'Start-FlareSolverrPortable.ps1'; Uri = 'http://127.0.0.1:8191/' }
+    'Obsidian' = @{ Slug = 'obsidian'; Kind = 'Exe'; Path = 'Obsidian.exe'; Process = 'Obsidian.exe' }
+    'telegram' = @{ Slug = 'telegram'; Kind = 'Exe'; Path = 'Telegram.exe'; Process = 'Telegram.exe' }
+    'Prowlarr' = @{ Slug = 'prowlarr'; Kind = 'PowerShell'; Path = 'Start-ProwlarrPortable.ps1' }
+    'cloudflare' = @{ Slug = 'cloudflare'; Kind = 'Cloudflare' }
+    'Jackett' = @{ Slug = 'jackett'; Kind = 'PowerShell'; Path = 'Start-JackettPortable.ps1' }
+    'kvrt' = @{ Slug = 'kvrt'; Kind = 'Exe'; Path = 'KVRT.exe'; Process = 'KVRT.exe' }
+    'scoop' = @{ Slug = 'scoop'; Kind = 'Command'; Path = 'shims\scoop.cmd'; Arguments = @('--version') }
+    'BleachBitAutoClean' = @{ Slug = 'bleachbitautoclean'; Kind = 'PowerShell'; Path = 'Invoke-BleachAutoClean.ps1'; Arguments = @('-SelfTest') }
+    'tailscale' = @{ Slug = 'tailscale'; Kind = 'Tailscale' }
+    'Process Lasso' = @{ Slug = 'process-lasso'; Kind = 'ProcessLasso' }
+    'OpenSpeedy' = @{ Slug = 'openspeedy'; Kind = 'Exe'; Path = 'Speedy.exe'; Process = 'Speedy.exe' }
+    'gamesavemanager' = @{ Slug = 'gamesavemanager'; Kind = 'Exe'; Path = 'gs_mngr_3.exe'; Process = 'gs_mngr_3.exe' }
+    'adw' = @{ Slug = 'adw'; Kind = 'Exe'; Path = 'AdwCleaner.exe'; Process = 'AdwCleaner.exe' }
+    'Everything' = @{ Slug = 'everything'; Kind = 'Everything' }
+    'qBittorrentSearchPluginsWiki' = @{ Slug = 'qbittorrentsearchpluginswiki'; Kind = 'Content'; Path = 'Home.md' }
+    'qBittorrentSearchPlugins' = @{ Slug = 'qbittorrentsearchplugins'; Kind = 'PluginSync' }
+}
+$customCatalogPath = Join-Path $PSScriptRoot 'InstalledAppRestoreCatalog.json'
+if (Test-Path -LiteralPath $customCatalogPath -PathType Leaf) {
+    $customEntries = Get-Content -LiteralPath $customCatalogPath -Raw | ConvertFrom-Json
+    foreach ($entry in $customEntries) {
+        $custom = @{
+            Slug = [string]$entry.Slug
+            Kind = [string]$entry.Kind
+            Path = [string]$entry.Path
+            Process = [string]$entry.Process
+            TargetPath = [string]$entry.TargetPath
+            Protected = [bool]$entry.Protected
+        }
+        $catalog[[string]$entry.Folder] = $custom
+    }
+}
+
+if($CatalogOnly) {
+    if($catalog.ContainsKey($Folder)){return $catalog[$Folder]}
+    return
+}
+if (-not $catalog.ContainsKey($Folder)) {
+    throw "Unknown installed-app restore target: $Folder"
+}
+$app = $catalog[$Folder]
+$targetPath = if ($app.TargetPath) { [string]$app.TargetPath } else { Join-Path $installRoot $Folder }
+$repository = 'michadockermisha/{0}' -f $app.Slug
+$workPath = Join-Path $installRoot ('.grestore-{0}-{1}' -f $PID, [guid]::NewGuid().ToString('N'))
+$rootfsPath = Join-Path $workPath 'rootfs'
+$stagingPath = Join-Path $rootfsPath 'home'
+$destinationStagePath = $null
+$previousTargetPath = $null
+$previouslyRunningServices = @()
+$originalSecurityProtocol = [Net.ServicePointManager]::SecurityProtocol
+
+$fullRoot = [IO.Path]::GetFullPath($installRoot).TrimEnd('\')
+$fullTarget = [IO.Path]::GetFullPath($targetPath).TrimEnd('\')
+$fullWork = [IO.Path]::GetFullPath($workPath).TrimEnd('\')
+$expectedTarget = if ($app.TargetPath) { [IO.Path]::GetFullPath([string]$app.TargetPath).TrimEnd('\') } else { $fullRoot + '\' + $Folder }
+$targetRoot = [IO.Path]::GetPathRoot($fullTarget).TrimEnd('\')
+if ($fullTarget -ne $expectedTarget -or $fullTarget -eq $targetRoot -or
+    -not $fullWork.StartsWith($fullRoot + '\', [StringComparison]::OrdinalIgnoreCase)) {
+    throw 'Installed-app restore path validation failed.'
+}
+if (-not (Test-Path -LiteralPath $installRoot -PathType Container)) {
+    # A restore is allowed to recreate the fixed installed-app root.  The
+    # target path is validated above against the catalog before this point, so
+    # this remains bounded to the known install root instead of accepting an
+    # arbitrary destination.
+    New-Item -ItemType Directory -LiteralPath $installRoot -Force -ErrorAction Stop | Out-Null
+}
+
+$tarPath = @(
+    (Get-Command tar.exe -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source)
+    (Join-Path $env:SystemRoot 'System32\tar.exe')
+) | Where-Object { $_ -and (Test-Path -LiteralPath $_ -PathType Leaf) } | Select-Object -First 1
+$curlPath = @(
+    (Get-Command curl.exe -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source)
+    (Join-Path $env:SystemRoot 'System32\curl.exe')
+) | Where-Object { $_ -and (Test-Path -LiteralPath $_ -PathType Leaf) } | Select-Object -First 1
+if (-not $tarPath -or -not $curlPath) {
+    throw 'Windows tar.exe and curl.exe are required.'
+}
+Write-GMenuProgress 'restore-start' 0 1 'initializing restore'
+
+function Remove-TemporaryFileWithRetry {
+    param([Parameter(Mandatory)][string]$LiteralPath)
+    for ($attempt = 1; $attempt -le 30; $attempt++) {
+        try {
+            Remove-Item -LiteralPath $LiteralPath -Force -ErrorAction Stop
+            return
+        } catch [IO.IOException] {
+            if ($attempt -eq 30) { throw }
+            Start-Sleep -Milliseconds 500
+        }
+    }
+}
+
+function Invoke-RegistryDownload {
+    param(
+        [Parameter(Mandatory)][string]$Uri,
+        [Parameter(Mandatory)][string]$Destination,
+        [Parameter(Mandatory)][string]$Token,
+        [int64]$ExpectedBytes = 0,
+        [string]$Phase = 'restore-download'
+    )
+    $args=@(
+        '--fail', '--location', '--silent', '--show-error'
+        '--connect-timeout', '20', '--max-time', '1800'
+        '--retry', '4', '--retry-delay', '2', '--retry-max-time', '2400'
+        '--speed-time', '60', '--speed-limit', '1024'
+        '--header', ('Authorization: Bearer ' + $Token)
+        '--output', $Destination, $Uri
+    )
+    $quoted=@($args | ForEach-Object {[GMenuPayload20260916V2]::Quote([string]$_)})
+    $start=New-Object Diagnostics.ProcessStartInfo
+    $start.FileName=$curlPath;$start.Arguments=($quoted -join ' ')
+    $start.UseShellExecute=$false;$start.CreateNoWindow=$true
+    $process=New-Object Diagnostics.Process;$process.StartInfo=$start
+    $clock=[Diagnostics.Stopwatch]::StartNew();$lastRender=[datetime]::MinValue
+    try {
+        [void]$process.Start()
+        Write-GMenuProgress $Phase 0 $ExpectedBytes 'download started'
+        do {
+            $now=Get-Date
+            $done=[int64]0
+            if(Test-Path -LiteralPath $Destination -PathType Leaf){try{$done=[int64](Get-Item -LiteralPath $Destination -Force).Length}catch{$done=0}}
+            if(($now-$lastRender).TotalMilliseconds -ge 250 -or $done -ne 0 -and $done -ge $ExpectedBytes){
+                Write-GMenuProgress $Phase $done $ExpectedBytes
+                $lastRender=$now
+            }
+            if(-not $process.WaitForExit(250)){continue}
+            break
+        }while($true)
+        $process.WaitForExit()
+        $done=[int64]0
+        if(Test-Path -LiteralPath $Destination -PathType Leaf){$done=[int64](Get-Item -LiteralPath $Destination -Force).Length}
+        Write-GMenuProgress $Phase $done $ExpectedBytes ('download complete exit='+$process.ExitCode)
+        if($process.ExitCode -ne 0){throw "Registry download failed with curl exit $($process.ExitCode): $Uri"}
+    } finally {$process.Dispose()}
+}
+
+function Stop-OwnedRuntime {
+    param([string]$Path)
+    $runningServices = @(
+        Get-Service -ErrorAction SilentlyContinue |
+            Where-Object { $_.Status -eq 'Running' } |
+            Where-Object {
+                $imagePath = (Get-ItemProperty -LiteralPath ('Registry::HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\' + $_.Name) -Name ImagePath -ErrorAction SilentlyContinue).ImagePath
+                $imagePath -and $imagePath.IndexOf($Path, [StringComparison]::OrdinalIgnoreCase) -ge 0
+            } |
+            Select-Object -ExpandProperty Name
+    )
+    foreach ($name in $runningServices) {
+        Stop-Service -Name $name -Force -ErrorAction Stop
+    }
+    if ($Folder -eq 'CodexMonitor') {
+        & "$env:SystemRoot\System32\schtasks.exe" /End /TN '\CodexLiveWallBackend' 2>$null | Out-Null
+    }
+    Get-Process -ErrorAction SilentlyContinue |
+        Where-Object {
+            $_.Path -and
+            $_.Path.StartsWith($Path + '\', [StringComparison]::OrdinalIgnoreCase)
+        } |
+        ForEach-Object { Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue }
+    return $runningServices
+}
+
+function Wait-ExactProcess {
+    param([string]$ExecutablePath, [string]$Name, [int]$Seconds = 30)
+    $deadline = (Get-Date).AddSeconds($Seconds)
+    do {
+        $process = Get-Process -ErrorAction SilentlyContinue |
+            Where-Object {
+                $_.ProcessName -eq [IO.Path]::GetFileNameWithoutExtension($Name) -and
+                $_.Path -and $_.Path.Equals($ExecutablePath, [StringComparison]::OrdinalIgnoreCase)
+            } |
+            Select-Object -First 1
+        if ($process) {
+            Start-Sleep -Seconds 2
+            $native = Get-Process -Id $process.Id -ErrorAction SilentlyContinue
+            if ($native -and -not $native.HasExited -and $native.Responding) {
+                return [pscustomobject]@{ ProcessId = $native.Id }
+            }
+        }
+        Start-Sleep -Milliseconds 500
+    } while ((Get-Date) -lt $deadline)
+    throw "$Name did not remain ready from $ExecutablePath."
+}
+
+function Wait-HttpReady {
+    param([string]$Uri, [int]$Seconds = 60)
+    $deadline = (Get-Date).AddSeconds($Seconds)
+    do {
+        try {
+            $response = Invoke-WebRequest -UseBasicParsing -Uri $Uri -TimeoutSec 4
+            if ($response.StatusCode -ge 200 -and $response.StatusCode -lt 500) {
+                return
+            }
+        } catch {
+        }
+        Start-Sleep -Milliseconds 750
+    } while ((Get-Date) -lt $deadline)
+    throw "HTTP readiness check failed: $Uri"
+}
+
+function Start-AndVerifyApp {
+    param([string[]]$PreviouslyRunningServices)
+    foreach ($serviceName in $PreviouslyRunningServices) {
+        Start-Service -Name $serviceName -ErrorAction SilentlyContinue
+    }
+
+    switch ([string]$app.Kind) {
+        'Exe' {
+            $exe = Join-Path $targetPath ([string]$app.Path)
+            if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) { throw "Launcher not found: $exe" }
+            Start-Process -FilePath $exe -WorkingDirectory (Split-Path -Parent $exe) | Out-Null
+            $process = Wait-ExactProcess -ExecutablePath $exe -Name ([string]$app.Process) -Seconds 45
+            return "process=$($process.ProcessId)"
+        }
+        'PowerShell' {
+            $script = Join-Path $targetPath ([string]$app.Path)
+            $arguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $script) + @($app.Arguments)
+            & "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" @arguments
+            if ($LASTEXITCODE -ne 0) { throw "Launcher script failed: $script" }
+            return 'script=ready'
+        }
+        'PowerShellDetached' {
+            $script = Join-Path $targetPath ([string]$app.Path)
+            if (-not (Test-Path -LiteralPath $script -PathType Leaf)) { throw "Launcher script not found: $script" }
+            $before = @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path.StartsWith($targetPath + '\', [StringComparison]::OrdinalIgnoreCase) } | Select-Object -ExpandProperty Id)
+            $launcher = Start-Process -FilePath "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $script) -WorkingDirectory (Split-Path -Parent $script) -PassThru
+            Start-Sleep -Seconds 4
+            $owned = @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path.StartsWith($targetPath + '\', [StringComparison]::OrdinalIgnoreCase) -and $before -notcontains $_.Id })
+            if ($owned.Count) { return "process=$($owned[0].Id)" }
+            $launcher.Refresh()
+            if (-not $launcher.HasExited) { return "launcher=$($launcher.Id)" }
+            if ($launcher.ExitCode -ne 0) { throw "Launcher script failed with exit $($launcher.ExitCode): $script" }
+            return 'script=completed'
+        }
+        'HttpScript' {
+            $script = Join-Path $targetPath ([string]$app.Path)
+            & "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File $script
+            if ($LASTEXITCODE -ne 0) { throw "Launcher script failed: $script" }
+            Wait-HttpReady -Uri ([string]$app.Uri)
+            return "http=$($app.Uri)"
+        }
+        'Command' {
+            $command = Join-Path $targetPath ([string]$app.Path)
+            if (-not (Test-Path -LiteralPath $command -PathType Leaf)) { throw "Command launcher not found: $command" }
+            $before=@(Get-Process -ErrorAction SilentlyContinue | Where-Object {
+                try { $_.Path -and $_.Path.StartsWith($targetPath+'\',[StringComparison]::OrdinalIgnoreCase) } catch { $false }
+            } | Select-Object -ExpandProperty Id)
+            $launcher=Start-Process -FilePath $command -ArgumentList @($app.Arguments) -WorkingDirectory (Split-Path -Parent $command) -WindowStyle Normal -PassThru
+            Write-GMenuProgress 'launch-wait' 0 1 'waiting for restored command handoff'
+            $deadline=(Get-Date).AddSeconds(5)
+            do {
+                Start-Sleep -Milliseconds 250
+                $owned=@(Get-Process -ErrorAction SilentlyContinue | Where-Object {
+                    try { $_.Path -and $_.Path.StartsWith($targetPath+'\',[StringComparison]::OrdinalIgnoreCase) -and $before -notcontains $_.Id } catch { $false }
+                })
+                if($owned.Count){Write-GMenuProgress 'launch-wait' 1 1 ('command ready process='+$owned[0].Id);return ('command=ready process='+$owned[0].Id)}
+                try{$launcher.Refresh()}catch{}
+                if($launcher.HasExited){
+                    if($launcher.ExitCode -ne 0){throw "Command launcher exited with code $($launcher.ExitCode): $command"}
+                    Write-GMenuProgress 'launch-wait' 1 1 ('command opened launcher='+$launcher.Id)
+                    return ('command=opened launcher='+$launcher.Id)
+                }
+                if((Get-Date) -ge $deadline){Write-GMenuProgress 'launch-wait' 1 1 ('handoff window elapsed launcher='+$launcher.Id);return ('command=opened launcher='+$launcher.Id)}
+            }while($true)
+        }
+        'Directory' {
+            if (-not (Test-Path -LiteralPath $targetPath -PathType Container)) {
+                throw "Restored directory is missing: $targetPath"
+            }
+            try {
+                Invoke-Item -LiteralPath $targetPath -ErrorAction Stop
+                return 'directory=opened'
+            } catch {
+                Write-Warning ("Restored directory is available but could not be opened automatically: {0}" -f $_.Exception.Message)
+                return 'directory=restored'
+            }
+        }
+        'Content' {
+            $content = Join-Path $targetPath ([string]$app.Path)
+            if (-not (Test-Path -LiteralPath $content -PathType Leaf)) { throw "Content validation failed: $content" }
+            return 'content=ready'
+        }
+        'PluginSync' {
+            $enginePath = Join-Path $env:LOCALAPPDATA 'qBittorrent\nova3\engines'
+            New-Item -ItemType Directory -Path $enginePath -Force | Out-Null
+            Get-ChildItem -LiteralPath $targetPath -File -Filter '*.py' -Force | ForEach-Object {
+                Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $enginePath $_.Name) -Force
+                if ((Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash -ne
+                    (Get-FileHash -LiteralPath (Join-Path $enginePath $_.Name) -Algorithm SHA256).Hash) {
+                    throw "qBittorrent plugin copy verification failed: $($_.Name)"
+                }
+            }
+            return 'plugins=synchronized'
+        }
+        'Everything' {
+            $exe = Join-Path $targetPath 'Everything.exe'
+            $service = Get-Service -Name 'Everything' -ErrorAction SilentlyContinue
+            if (-not $service) {
+                & $exe -install-service | Out-Null
+            }
+            Start-Service -Name 'Everything' -ErrorAction Stop
+            Start-Process -FilePath $exe | Out-Null
+            $process = Wait-ExactProcess -ExecutablePath $exe -Name 'everything.exe'
+            return "service=Running process=$($process.ProcessId)"
+        }
+        'ProcessLasso' {
+            $gui = Join-Path $targetPath 'ProcessLasso.exe'
+            $governor = Join-Path $targetPath 'ProcessGovernor.exe'
+            $stub = Join-Path $targetPath 'srvstub.exe'
+            if (-not (Get-Service -Name 'ProcessGovernor' -ErrorAction SilentlyContinue)) {
+                New-Service -Name 'ProcessGovernor' -DisplayName 'Process Lasso Core (Process Governor)' `
+                    -BinaryPathName ('"{0}" "{1}" "ProcessGovernor" /exitevent:Global\ProcessGovernorExitEvent' -f $stub, $governor) `
+                    -StartupType Automatic | Out-Null
+            }
+            Start-Service -Name 'ProcessGovernor' -ErrorAction Stop
+            Start-Process -FilePath $gui | Out-Null
+            $process = Wait-ExactProcess -ExecutablePath $gui -Name 'ProcessLasso.exe'
+            return "service=Running process=$($process.ProcessId)"
+        }
+        'Tailscale' {
+            $daemon = Join-Path $targetPath 'tailscaled.exe'
+            $cli = Join-Path $targetPath 'tailscale.exe'
+            $gui = Join-Path $targetPath 'tailscale-ipn.exe'
+            $service = Get-Service -Name 'Tailscale' -ErrorAction SilentlyContinue
+            if (-not $service) {
+                New-Service -Name 'Tailscale' -DisplayName 'Tailscale' -BinaryPathName ('"{0}"' -f $daemon) -StartupType Automatic | Out-Null
+            } else {
+                & "$env:SystemRoot\System32\sc.exe" config Tailscale 'binPath=' ('"{0}"' -f $daemon) 'start=' auto | Out-Null
+                if ($LASTEXITCODE -ne 0) { throw 'Could not repair the Tailscale service.' }
+            }
+            Start-Service -Name 'Tailscale' -ErrorAction Stop
+            Start-Process -FilePath $gui | Out-Null
+            Start-Sleep -Seconds 3
+            $status = @(& $cli status 2>&1)
+            if ($LASTEXITCODE -ne 0 -and ($status -join ' ') -notmatch 'Logged out|NeedsLogin') {
+                throw "Tailscale CLI readiness failed: $($status -join ' ')"
+            }
+            $process = Wait-ExactProcess -ExecutablePath $gui -Name 'tailscale-ipn.exe'
+            return "service=Running process=$($process.ProcessId)"
+        }
+        'Cloudflare' {
+            $serviceExe = Join-Path $targetPath 'warp-svc.exe'
+            $cli = Join-Path $targetPath 'warp-cli.exe'
+            $gui = Join-Path $targetPath 'Cloudflare WARP.exe'
+            & "$env:SystemRoot\System32\sc.exe" config CloudflareWARP 'binPath=' ('"{0}"' -f $serviceExe) | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw 'Could not repair CloudflareWARP service path.' }
+            Start-Service -Name 'CloudflareWARP' -ErrorAction Stop
+            $status = @(& $cli --no-ansi --json status 2>&1)
+            if ($LASTEXITCODE -ne 0) { throw "Cloudflare CLI readiness failed: $($status -join ' ')" }
+            Start-Process -FilePath $gui | Out-Null
+            $process = Wait-ExactProcess -ExecutablePath $gui -Name 'Cloudflare WARP.exe'
+            return "service=Running process=$($process.ProcessId)"
+        }
+        'CodexMonitor' {
+            $launcher = Join-Path $targetPath 'Open-CodexMonitor.cmd'
+            Start-Process -FilePath $launcher | Out-Null
+            $daemon = Join-Path $targetPath 'app-live-codex-wall\codex_monitor_daemon.exe'
+            $gui = Join-Path $targetPath 'app-live-codex-wall\codex-monitor.exe'
+            $daemonProcess = Wait-ExactProcess -ExecutablePath $daemon -Name 'codex_monitor_daemon.exe' -Seconds 60
+            $guiProcess = Wait-ExactProcess -ExecutablePath $gui -Name 'codex-monitor.exe' -Seconds 60
+            return "daemon=$($daemonProcess.ProcessId) process=$($guiProcess.ProcessId)"
+        }
+        default {
+            throw "Unsupported launch kind for $Folder`: $($app.Kind)"
+        }
+    }
+}
+
+function Set-RestoredLaunchFallback {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Root
+    )
+
+    # A saved launcher is useful metadata, not a prerequisite for restoring a
+    # payload.  Discover a replacement only when the payload itself contains
+    # one; otherwise keep the verified payload as a directory.  This keeps the
+    # transaction independent of a particular filename, nesting, or target
+    # path and avoids inventing a launcher that is not in the backup.
+    $candidate = $null
+    $resolver = Get-Command Resolve-GMenuLauncher -CommandType Function -ErrorAction SilentlyContinue
+    if ($resolver) {
+        try {
+            $candidate = [string](& $resolver.Name $Root $Folder | Select-Object -Last 1)
+        } catch {
+            Write-GMenuProgress 'launch-detect' 1 1 'payload launcher discovery was inconclusive; using directory restore'
+        }
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($candidate)) {
+        try {
+            $rootFull = [IO.Path]::GetFullPath($Root).TrimEnd('\')
+            $candidateFull = [IO.Path]::GetFullPath($candidate)
+            $insideRoot = $candidateFull.StartsWith($rootFull + '\', [StringComparison]::OrdinalIgnoreCase)
+            if ($insideRoot -and (Test-Path -LiteralPath $candidateFull -PathType Leaf)) {
+                $relative = $candidateFull.Substring($rootFull.Length + 1)
+                $extension = [IO.Path]::GetExtension($candidateFull).ToLowerInvariant()
+                $kind = switch ($extension) {
+                    '.exe' { 'Exe'; break }
+                    '.ps1' { 'PowerShell'; break }
+                    '.cmd' { 'Command'; break }
+                    '.bat' { 'Command'; break }
+                    default { $null; break }
+                }
+                if ($kind) {
+                    $app.Kind = $kind
+                    $app.Path = $relative
+                    $app.Process = if ($kind -eq 'Exe') { [IO.Path]::GetFileName($candidateFull) } else { $null }
+                    $app.Uri = $null
+                    Write-GMenuProgress 'launch-detect' 1 1 ('using payload launcher ' + $relative)
+                    return $true
+                }
+            }
+        } catch {
+            Write-GMenuProgress 'launch-detect' 1 1 'payload launcher was invalid; using directory restore'
+        }
+    }
+
+    $app.Kind = 'Directory'
+    $app.Path = '.'
+    $app.Process = $null
+    $app.Uri = $null
+    $app.Arguments = @()
+    Write-GMenuProgress 'launch-detect' 1 1 'payload has no runnable launcher; restoring as a directory'
+    return $false
+}
+
+function Assert-RestoredLaunchArtifact {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Root
+    )
+
+    $kind = [string]$app.Kind
+    $requiredPaths = @()
+    switch ($kind) {
+        'Exe' {
+            if ([string]::IsNullOrWhiteSpace([string]$app.Path)) { throw "The $Folder catalog entry has no executable path." }
+            $requiredPaths = @(Join-Path $Root ([string]$app.Path))
+        }
+        'PowerShell' { $requiredPaths = @(Join-Path $Root ([string]$app.Path)) }
+        'PowerShellDetached' { $requiredPaths = @(Join-Path $Root ([string]$app.Path)) }
+        'HttpScript' { $requiredPaths = @(Join-Path $Root ([string]$app.Path)) }
+        'Command' { $requiredPaths = @(Join-Path $Root ([string]$app.Path)) }
+        'Content' { $requiredPaths = @(Join-Path $Root ([string]$app.Path)) }
+        'Everything' { $requiredPaths = @(Join-Path $Root 'Everything.exe') }
+        'ProcessLasso' {
+            $requiredPaths = @(
+                (Join-Path $Root 'ProcessLasso.exe')
+                (Join-Path $Root 'ProcessGovernor.exe')
+                (Join-Path $Root 'srvstub.exe')
+            )
+        }
+        'Tailscale' {
+            $requiredPaths = @(
+                (Join-Path $Root 'tailscaled.exe')
+                (Join-Path $Root 'tailscale.exe')
+                (Join-Path $Root 'tailscale-ipn.exe')
+            )
+        }
+        'Cloudflare' {
+            $requiredPaths = @(
+                (Join-Path $Root 'warp-svc.exe')
+                (Join-Path $Root 'warp-cli.exe')
+                (Join-Path $Root 'Cloudflare WARP.exe')
+            )
+        }
+        'CodexMonitor' {
+            $requiredPaths = @(
+                (Join-Path $Root 'Open-CodexMonitor.cmd')
+                (Join-Path $Root 'app-live-codex-wall\codex_monitor_daemon.exe')
+                (Join-Path $Root 'app-live-codex-wall\codex-monitor.exe')
+            )
+        }
+        'PluginSync' {
+            $requiredPaths = @(Get-ChildItem -LiteralPath $Root -File -Filter '*.py' -Force | Select-Object -ExpandProperty FullName)
+            if (-not $requiredPaths.Count) {
+                throw "Restored payload has no qBittorrent plugin files under $Root."
+            }
+        }
+        default {
+            # The subsequent launcher switch remains the authoritative check
+            # for kinds that do not have one fixed artifact to preflight.
+            return
+        }
+    }
+
+    $missingPaths = @($requiredPaths | Where-Object {
+        -not (Test-Path -LiteralPath $_ -PathType Leaf)
+    })
+    if ($missingPaths.Count) {
+        if ($kind -eq 'PluginSync') {
+            throw "Restored payload is missing the registered $kind launcher/content: $($missingPaths -join ', ')"
+        }
+        [void](Set-RestoredLaunchFallback -Root $Root)
+    }
+}
+
+function Test-InstalledAppDockerTargetLabel {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$Labels,
+        [Parameter(Mandatory = $true)]
+        [string]$Folder,
+        [Parameter(Mandatory = $true)]
+        [string]$FullTarget
+    )
+
+    $sourcePath = if ($null -eq $Labels) { '' } else { [string]$Labels.'backup.source.path' }
+    if ([string]::IsNullOrWhiteSpace($sourcePath)) {
+        return [pscustomobject]@{ Accepted = $false; Kind = 'missing'; Path = $sourcePath; Reason = 'backup.source.path is empty.' }
+    }
+    if (-not [IO.Path]::IsPathRooted($sourcePath)) {
+        return [pscustomobject]@{ Accepted = $false; Kind = 'relative'; Path = $sourcePath; Reason = 'backup.source.path must be absolute.' }
+    }
+
+    try {
+        $normalizedSource = [IO.Path]::GetFullPath($sourcePath).TrimEnd('\')
+        $normalizedTarget = [IO.Path]::GetFullPath($FullTarget).TrimEnd('\')
+    }
+    catch {
+        return [pscustomobject]@{ Accepted = $false; Kind = 'invalid'; Path = $sourcePath; Reason = $_.Exception.Message }
+    }
+
+    if ($normalizedSource.Equals($normalizedTarget, [StringComparison]::OrdinalIgnoreCase)) {
+        return [pscustomobject]@{ Accepted = $true; Kind = 'target'; Path = $normalizedSource; Reason = 'Exact installed-app target label.' }
+    }
+
+    # Images published before the durable label-path contract used a private
+    # GMenu staging directory as backup.source.path.  Accept only that exact
+    # shape, for the same user and application folder; arbitrary mismatches
+    # remain rejected so a wrong image cannot restore over another app.
+    $targetLeaf = Split-Path -Path $normalizedTarget -Leaf
+    $sourceLeaf = Split-Path -Path $normalizedSource -Leaf
+    $sourceParent = Split-Path -Path $normalizedSource -Parent
+    $sourceParentLeaf = Split-Path -Path $sourceParent -Leaf
+    $sourceGrandparent = Split-Path -Path $sourceParent -Parent
+    $gmenuRoot = [IO.Path]::GetFullPath($gmenuStateRoot).TrimEnd('\')
+    $legacyGMenuShape =
+        $targetLeaf.Equals($Folder, [StringComparison]::OrdinalIgnoreCase) -and
+        $sourceLeaf.Equals($Folder, [StringComparison]::OrdinalIgnoreCase) -and
+        $sourceParentLeaf -match '^\.gmenu-work-[0-9a-fA-F]{32}$' -and
+        $sourceGrandparent.Equals($gmenuRoot, [StringComparison]::OrdinalIgnoreCase)
+    if ($legacyGMenuShape) {
+        return [pscustomobject]@{ Accepted = $true; Kind = 'legacy-gmenu-work'; Path = $normalizedSource; Reason = 'Strict legacy GMenu staging label accepted for migration.' }
+    }
+
+    return [pscustomobject]@{ Accepted = $false; Kind = 'mismatch'; Path = $normalizedSource; Reason = "Label does not identify the saved target '$normalizedTarget'." }
+}
+
+function Get-GMenuLatestRemoteDockerTag {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$RepoSlug)
+
+    if($RepoSlug -notmatch '^[a-z0-9][a-z0-9._-]*$') { throw "Invalid Docker Hub repository slug: $RepoSlug" }
+    $uri="https://hub.docker.com/v2/namespaces/michadockermisha/repositories/$RepoSlug/tags?page_size=100&ordering=-last_updated"
+    for($attempt=1;$attempt -le 3;$attempt++) {
+        try {
+            $tagNames=New-Object 'System.Collections.Generic.List[string]'
+            $next=$uri
+            while($next) {
+                $response=Invoke-RestMethod -Uri $next -Method Get -TimeoutSec 30 -ErrorAction Stop
+                foreach($result in @($response.results)) {
+                    if($result.name){[void]$tagNames.Add([string]$result.name)}
+                }
+                $next=[string]$response.next
+            }
+            if($tagNames.Count -eq 0){throw "No Docker tags found for michadockermisha/$RepoSlug."}
+            $numeric=@($tagNames | Where-Object {$_ -match '^\d+$'} | ForEach-Object {[int64]$_} | Sort-Object)
+            if($numeric.Count -gt 0){return ([string]$numeric[-1])}
+            return ([string]($tagNames | Sort-Object | Select-Object -Last 1))
+        } catch {
+            if($attempt -ge 3){throw "Failed to query Docker Hub tags for michadockermisha/$RepoSlug. $($_.Exception.Message)"}
+            Start-Sleep -Seconds $attempt
+        }
+    }
+}
+
+try {
+    [Net.ServicePointManager]::SecurityProtocol = $originalSecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+    Write-GMenuProgress 'restore-auth' 0 1 'requesting registry token'
+    $latestTag = [string](Get-GMenuLatestRemoteDockerTag -RepoSlug ([string]$app.Slug) | Select-Object -Last 1)
+    if ([string]::IsNullOrWhiteSpace($latestTag)) { throw "No Docker tag found for $repository." }
+    $latestTag = $latestTag.Trim()
+    $imageRef = '{0}:{1}' -f $repository, $latestTag
+    Write-Host "[g$Folder] Resolving $imageRef" -ForegroundColor Cyan
+
+    $tokenUri = 'https://auth.docker.io/token?service=registry.docker.io&scope=repository:{0}:pull' -f $repository
+    $token = (Invoke-RestMethod -Uri $tokenUri -Method Get -TimeoutSec 30).token
+    if ([string]::IsNullOrWhiteSpace([string]$token)) { throw "No pull token returned for $repository." }
+    Write-GMenuProgress 'restore-auth' 1 1 'registry token acquired'
+    Write-GMenuProgress 'restore-manifest' 0 1 'fetching and validating registry manifest'
+    $registryRoot = 'https://registry-1.docker.io/v2/{0}' -f $repository
+    $headers = @{
+        Authorization = 'Bearer ' + $token
+        Accept = 'application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json'
+    }
+    $manifest = Invoke-RestMethod -Uri "$registryRoot/manifests/$latestTag" -Headers $headers -Method Get -TimeoutSec 30
+    $layers = @($manifest.layers)
+    if ($manifest.schemaVersion -ne 2 -or $layers.Count -eq 0) { throw "Unsupported manifest for $imageRef." }
+    Write-GMenuProgress 'restore-manifest' 1 1 'verified registry manifest acquired'
+
+    New-Item -ItemType Directory -Path $rootfsPath -Force | Out-Null
+    $configPath = Join-Path $workPath 'config.json'
+    Invoke-RegistryDownload -Uri "$registryRoot/blobs/$($manifest.config.digest)" -Destination $configPath -Token $token -ExpectedBytes ([int64]$manifest.config.size) -Phase 'restore-config'
+    Write-GMenuProgress 'restore-config-verify' 0 1 'validating Docker config digest and labels'
+    $configHash = (Get-FileHash -LiteralPath $configPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    if (('sha256:' + $configHash) -ne [string]$manifest.config.digest) { throw 'Docker config digest validation failed.' }
+    $config = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json
+    $labels = $config.config.Labels
+    if ([string]$labels.'backup.source.repo' -ne $repository -or [string]$labels.'backup.source.tag' -ne $latestTag) {
+        throw "Docker labels did not match $imageRef."
+    }
+    $labelCheck = Test-InstalledAppDockerTargetLabel -Labels $labels -Folder $Folder -FullTarget $fullTarget
+    if (-not $labelCheck.Accepted) {
+        throw "Docker image target-path label does not match the saved restore path: $fullTarget (label='$($labelCheck.Path)'; reason=$($labelCheck.Reason))"
+    }
+    if ($labelCheck.Kind -eq 'legacy-gmenu-work') {
+        Write-Warning "Accepted legacy GMenu staging label for $Folder; future publishes use the installed target path."
+    }
+    $payloadDirectory = [string]$labels.'backup.payload.directory'
+    if ([string]::IsNullOrWhiteSpace($payloadDirectory)) { $payloadDirectory = 'home' }
+    if ($payloadDirectory -match '[\\/]' -or $payloadDirectory -in '.', '..') {
+        throw "Unsafe payload directory label: $payloadDirectory"
+    }
+    Write-GMenuProgress 'restore-config-verify' 1 1 'Docker config digest and labels verified'
+    $stagingPath = Join-Path $rootfsPath $payloadDirectory
+
+    Write-GMenuProgress 'restore-layers' 0 $layers.Count 'downloading and validating image layers'
+    for ($index = 0; $index -lt $layers.Count; $index++) {
+        $layer = $layers[$index]
+        $layerType = [string]$layer.mediaType
+        if ($layerType -notmatch '(?:\.tar|tar\+gzip)$') { throw "Unsupported layer type: $layerType" }
+        $compressed = $layerType -match 'tar\+gzip$'
+        $layerName = if ($compressed) { 'layer-{0}.tar.gz' -f $index } else { 'layer-{0}.tar' -f $index }
+        $layerPath = Join-Path $workPath $layerName
+        $layerPhase=('restore-layer-{0}/{1}' -f ($index + 1),$layers.Count)
+        Write-Host ("[g{0}] Downloading layer {1}/{2}" -f $Folder, ($index + 1), $layers.Count) -ForegroundColor Cyan
+        Write-Host ('GRESTORE_DOWNLOAD layer='+($index + 1)+'/'+$layers.Count)
+        Write-GMenuProgress $layerPhase 0 ([int64]$layer.size) 'downloading registry layer'
+        Invoke-RegistryDownload -Uri "$registryRoot/blobs/$($layer.digest)" -Destination $layerPath -Token $token -ExpectedBytes ([int64]$layer.size) -Phase $layerPhase
+        $layerInfo = Get-Item -LiteralPath $layerPath
+        if ([int64]$layer.size -ne $layerInfo.Length) { throw "Layer size validation failed: $($layer.digest)" }
+        $layerHash = (Get-FileHash -LiteralPath $layerPath -Algorithm SHA256).Hash.ToLowerInvariant()
+        if (('sha256:' + $layerHash) -ne [string]$layer.digest) { throw "Layer digest validation failed: $($layer.digest)" }
+        $listArguments = if ($compressed) { @('-tzf', $layerPath) } else { @('-tf', $layerPath) }
+        $entries = @(& $tarPath @listArguments)
+        if ($LASTEXITCODE -ne 0) { throw "Could not list layer: $($layer.digest)" }
+        foreach ($entry in $entries) {
+            $normalized = ([string]$entry).Replace('\', '/')
+            if ($normalized.StartsWith('/') -or $normalized -match '(^|/)\.\.(/|$)') { throw "Unsafe layer path: $entry" }
+        }
+        $extractArguments = if ($compressed) { @('-xzf', $layerPath, '-C', $rootfsPath) } else { @('-xf', $layerPath, '-C', $rootfsPath) }
+        $verifyPhase=$layerPhase+'-verify'
+        Write-GMenuProgress $verifyPhase 0 1 'hashing and extracting registry layer'
+        & $tarPath @extractArguments
+        if ($LASTEXITCODE -ne 0) { throw "Could not extract layer: $($layer.digest)" }
+        Write-GMenuProgress $verifyPhase 1 1 'registry layer verified and extracted'
+        Write-GMenuProgress 'restore-layers' ($index + 1) $layers.Count
+        Remove-TemporaryFileWithRetry -LiteralPath $layerPath
+    }
+
+    if (-not (Test-Path -LiteralPath $stagingPath -PathType Container)) { throw "Image payload is missing: $imageRef" }
+    $stagedFiles = @(Get-ChildItem -LiteralPath $stagingPath -File -Recurse -Force)
+    $stagedDirectories = @(Get-ChildItem -LiteralPath $stagingPath -Directory -Recurse -Force)
+    $stagedBytes = [int64](($stagedFiles | Measure-Object Length -Sum).Sum)
+    $expectedFiles = [int64]$labels.'backup.source.files'
+    $expectedBytes = [int64]$labels.'backup.source.bytes'
+    $expectedDirectoriesLabel = [string]$labels.'backup.source.directories'
+    $expectedDirectories = if ([string]::IsNullOrWhiteSpace($expectedDirectoriesLabel)) { $null } else { [int64]$expectedDirectoriesLabel }
+    if ($stagedFiles.Count -ne $expectedFiles -or $stagedBytes -ne $expectedBytes) {
+        throw "Image payload mismatch for $imageRef`: files $($stagedFiles.Count)/$expectedFiles bytes $stagedBytes/$expectedBytes."
+    }
+    if ($null -ne $expectedDirectories -and $stagedDirectories.Count -ne $expectedDirectories) {
+        throw "Image directory mismatch for $imageRef`: directories $($stagedDirectories.Count)/$expectedDirectories."
+    }
+    if ($SelfTest) {
+        Write-Output "GRESTORE_SELFTEST_OK folder=$Folder image=$imageRef files=$expectedFiles bytes=$expectedBytes protected=$([bool]$app.Protected)"
+        return
+    }
+
+    $previouslyRunningServices = @(Stop-OwnedRuntime -Path $targetPath)
+    $robocopyPath = Join-Path $env:SystemRoot 'System32\robocopy.exe'
+    if ($app.Protected) {
+        if (-not (Test-Path -LiteralPath $targetPath -PathType Container)) {
+            New-Item -ItemType Directory -Path $targetPath -Force | Out-Null
+        }
+        [string[]]$sessionExclusions = @()
+        $existingSessionFolders = @('UserData','user_data','user-data','data','profile','profiles','portable_config','tdata' | Where-Object { Test-Path -LiteralPath (Join-Path $targetPath $_) -PathType Container })
+        if ($existingSessionFolders.Count) { $sessionExclusions = @('/XD') + $existingSessionFolders }
+        $excludedPrefixes=@($existingSessionFolders | ForEach-Object {(Join-Path $stagingPath $_).TrimEnd('\')+'\'})
+        $overlayFiles=@($stagedFiles | Where-Object {
+            $filePath=$_.FullName
+            -not @($excludedPrefixes | Where-Object {$filePath.StartsWith($_,[StringComparison]::OrdinalIgnoreCase)}).Count
+        })
+        $overlayBytes=[int64](($overlayFiles | Measure-Object Length -Sum).Sum)
+        Write-GMenuProgress 'restore-copy' 0 1 'overlaying verified application files'
+        $copyExit=Invoke-GMenuRobocopy $robocopyPath $stagingPath $targetPath @('/E','/COPY:DAT','/DCOPY:DAT','/R:3','/W:1','/NFL','/NDL','/NJH','/NJS','/NP')+$sessionExclusions 'restore-copy-bytes' $overlayBytes
+        if ($copyExit -ge 8) { throw "Protected overlay failed for $Folder with robocopy exit $copyExit." }
+        Write-GMenuProgress 'restore-copy' 1 1 'verified application overlay complete'
+    } else {
+        $targetParent = Split-Path -Parent $fullTarget
+        if ([string]::IsNullOrWhiteSpace($targetParent)) { throw "Target parent could not be resolved: $fullTarget" }
+        if (-not (Test-Path -LiteralPath $targetParent -PathType Container)) {
+            New-Item -ItemType Directory -Path $targetParent -Force | Out-Null
+        }
+        $destinationStagePath = Join-Path $targetParent ('.grestore-new-{0}-{1}' -f $Folder, [guid]::NewGuid().ToString('N'))
+        $previousTargetPath = Join-Path $targetParent ('.grestore-old-{0}-{1}' -f $Folder, [guid]::NewGuid().ToString('N'))
+        foreach ($siblingPath in @($destinationStagePath, $previousTargetPath)) {
+            $fullSibling = [IO.Path]::GetFullPath($siblingPath)
+            if (-not $fullSibling.StartsWith([IO.Path]::GetFullPath($targetParent).TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase) -or
+                [IO.Path]::GetFileName($fullSibling) -notlike '.grestore-*-*') {
+                throw "Unsafe transactional restore path: $fullSibling"
+            }
+        }
+        New-Item -ItemType Directory -Path $destinationStagePath -Force | Out-Null
+        Write-GMenuProgress 'restore-copy' 0 1 'staging verified application files'
+        $copyExit=Invoke-GMenuRobocopy $robocopyPath $stagingPath $destinationStagePath @('/E','/COPY:DAT','/DCOPY:DAT','/SL','/SJ','/R:3','/W:1','/NFL','/NDL','/NJH','/NJS','/NP') 'restore-copy-bytes' $expectedBytes
+        if ($copyExit -ge 8) { throw "Destination staging failed for $Folder with robocopy exit $copyExit." }
+        Write-GMenuProgress 'restore-copy' 1 1 'application files staged'
+        $destinationFiles = @(Get-ChildItem -LiteralPath $destinationStagePath -File -Recurse -Force)
+        $destinationDirectories = @(Get-ChildItem -LiteralPath $destinationStagePath -Directory -Recurse -Force)
+        $destinationBytes = [int64](($destinationFiles | Measure-Object Length -Sum).Sum)
+        if ($destinationFiles.Count -ne $expectedFiles -or $destinationBytes -ne $expectedBytes -or
+            ($null -ne $expectedDirectories -and $destinationDirectories.Count -ne $expectedDirectories)) {
+            throw "Destination staging verification failed for $Folder."
+        }
+        Assert-RestoredLaunchArtifact -Root $destinationStagePath
+        if (Test-Path -LiteralPath $targetPath) {
+            $item = Get-Item -LiteralPath $targetPath -Force
+            if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw "Refusing to replace reparse target: $targetPath" }
+            Move-Item -LiteralPath $targetPath -Destination $previousTargetPath -Force
+        }
+        try {
+            Move-Item -LiteralPath $destinationStagePath -Destination $targetPath -Force
+            $destinationStagePath = $null
+            $restoredFiles = @(Get-ChildItem -LiteralPath $targetPath -File -Recurse -Force)
+            $restoredDirectories = @(Get-ChildItem -LiteralPath $targetPath -Directory -Recurse -Force)
+            $restoredBytes = [int64](($restoredFiles | Measure-Object Length -Sum).Sum)
+            if ($restoredFiles.Count -ne $expectedFiles -or $restoredBytes -ne $expectedBytes -or
+                ($null -ne $expectedDirectories -and $restoredDirectories.Count -ne $expectedDirectories)) {
+                throw "Installed payload verification failed for $Folder."
+            }
+            if ($previousTargetPath -and (Test-Path -LiteralPath $previousTargetPath)) {
+                # Preserve current portable sessions and retain the old app for recovery.
+                foreach ($dataFolder in @('UserData','user_data','user-data','data','profile','profiles','portable_config','tdata')) {
+                    $savedData = Join-Path $previousTargetPath $dataFolder
+                    $restoredData = Join-Path $targetPath $dataFolder
+                    if (Test-Path -LiteralPath $savedData -PathType Container) {
+                        if ((Get-Item -LiteralPath $savedData -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Refusing redirected session data.' }
+                        $savedFiles=@(Get-ChildItem -LiteralPath $savedData -File -Recurse -Force)
+                        $savedBytes=[int64](($savedFiles | Measure-Object Length -Sum).Sum)
+                        Write-GMenuProgress 'session-preserve' 0 1 ('preserving '+$dataFolder)
+                        $sessionExit=Invoke-GMenuRobocopy $robocopyPath $savedData $restoredData @('/MIR','/COPY:DAT','/DCOPY:DAT','/R:2','/W:1','/NFL','/NDL','/NJH','/NJS','/NP') 'session-preserve-bytes' $savedBytes
+                        if ($sessionExit -ge 8) { throw "Saved session preservation failed for $Folder." }
+                        Write-GMenuProgress 'session-preserve' 1 1 ('preserved '+$dataFolder)
+                    }
+                }
+                Write-Host "GRESTORE_PREVIOUS_APP=$previousTargetPath"
+            }
+        } catch {
+            if ($previousTargetPath -and (Test-Path -LiteralPath $previousTargetPath)) {
+                if (Test-Path -LiteralPath $targetPath) {
+                    Remove-Item -LiteralPath $targetPath -Recurse -Force -Confirm:$false
+                }
+                Move-Item -LiteralPath $previousTargetPath -Destination $targetPath -Force
+                $previousTargetPath = $null
+            } elseif (Test-Path -LiteralPath $targetPath) {
+                Remove-Item -LiteralPath $targetPath -Recurse -Force -Confirm:$false
+            }
+            throw
+        }
+    }
+
+    try {
+        $ready = Start-AndVerifyApp -PreviouslyRunningServices $previouslyRunningServices
+    } catch {
+        if (-not $app.Protected) {
+            try { Stop-OwnedRuntime -Path $targetPath | Out-Null } catch { }
+            if ($previousTargetPath -and (Test-Path -LiteralPath $previousTargetPath)) {
+                if (Test-Path -LiteralPath $targetPath) {
+                    Remove-Item -LiteralPath $targetPath -Recurse -Force -Confirm:$false
+                }
+                Move-Item -LiteralPath $previousTargetPath -Destination $targetPath -Force
+                $previousTargetPath = $null
+            } elseif (Test-Path -LiteralPath $targetPath) {
+                Remove-Item -LiteralPath $targetPath -Recurse -Force -Confirm:$false
+            }
+        }
+        throw
+    }
+    $functionName = 'g' + ($Folder -replace '[^A-Za-z0-9]', '')
+    Write-Output "GRESTORE_LAUNCH_OK function=$functionName image=$imageRef protected=$([bool]$app.Protected) login=unverified $ready"
+} catch {
+    foreach ($serviceName in @($previouslyRunningServices)) {
+        Start-Service -Name $serviceName -ErrorAction SilentlyContinue
+    }
+    throw
+} finally {
+    Write-GMenuProgress 'cleanup' 0 1 'releasing temporary restore state'
+    [Net.ServicePointManager]::SecurityProtocol = $originalSecurityProtocol
+    if (Test-Path -LiteralPath $workPath -PathType Container) {
+        Remove-Item -LiteralPath $workPath -Recurse -Force -Confirm:$false -ErrorAction SilentlyContinue
+    }
+    if ($destinationStagePath -and (Test-Path -LiteralPath $destinationStagePath -PathType Container)) {
+        Remove-Item -LiteralPath $destinationStagePath -Recurse -Force -Confirm:$false -ErrorAction SilentlyContinue
+    }
+    Write-GMenuProgress 'cleanup' 1 1 'temporary restore state released'
+}

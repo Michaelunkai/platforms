@@ -1,0 +1,26 @@
+# agent3-wipe-insert.txt - INSERT AFTER repair-upgrade.ps1 line 1484
+# (after: Write-CleanupLog 'DONE target absent' ; before: exit 0 in the final-success path;
+#  variables are backtick-escaped because this block lives inside the $cleanupContent @"..."@ block.
+#  Optional: apply the same block after line 1453 for the already-absent early path.)
+# DO NOT edit repair-upgrade.ps1 here; integrator applies this block at the anchor.
+# Exact 20-line block below:
+`$winlogonKey = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon'
+Write-CleanupLog 'WIPE autologon begin'
+Remove-ItemProperty -Path `$winlogonKey -Name 'DefaultPassword' -Force -ErrorAction SilentlyContinue
+Write-CleanupLog 'WIPE DefaultPassword removed'
+Set-ItemProperty -Path `$winlogonKey -Name 'AutoAdminLogon' -Value '0' -Force -ErrorAction SilentlyContinue
+Write-CleanupLog 'WIPE AutoAdminLogon=0'
+Remove-ItemProperty -Path `$winlogonKey -Name 'AutoLogonCount' -Force -ErrorAction SilentlyContinue
+Write-CleanupLog 'WIPE AutoLogonCount removed'
+`$cleanedPath = Join-Path (Split-Path -Parent `$PSCommandPath) 'autologon-cleaned.json'
+`$readyMarker = Join-Path (Split-Path -Parent `$PSCommandPath) 'desktop-ready.marker'
+`$cleaned = [ordered]@{
+    Timestamp = (Get-Date -Format s)
+    DefaultPasswordRemoved = `$true
+    AutoAdminLogon = '0'
+    AutoLogonCountRemoved = `$true
+}
+`$cleaned | ConvertTo-Json -Depth 3 | Set-Content -LiteralPath `$cleanedPath -Encoding ASCII -Force
+`$null = New-Item -ItemType File -Path `$readyMarker -Force
+Write-CleanupLog ('WIPE markers cleaned=' + `$cleanedPath + ' ready=' + `$readyMarker)
+Write-CleanupLog 'DONE autologon wiped; desktop-ready marked'

@@ -1,6 +1,10 @@
 # ALLOW_DESTRUCTIVE: removes only the one-shot WinSetupPostBootWindowsOldCleanup triggers created by repair-upgrade.ps1 after Terminal is launched.
 $ErrorActionPreference = 'Continue'
-$terminalLauncher = 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe'
+$successMarker = Join-Path $PSScriptRoot 'upgrade-completed.marker'
+if (-not (Test-Path -LiteralPath $successMarker)) { exit 0 }
+$setupState = Get-ItemProperty 'HKLM:\SYSTEM\Setup' -ErrorAction SilentlyContinue
+if ($setupState.SystemSetupInProgress -or $setupState.OOBEInProgress) { exit 0 }
+$terminalLauncher = 'C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe'
 $terminalLauncherKind = 'PowerShell'
 $commandText = 'c; rrm windows.old'
 $cleanupPath = 'F:\study\Platforms\windows\system-administration\scripts\powershell\repair\upgrade\inplace\win11\auto\postboot\Force-Delete-WindowsOld.ps1'
@@ -240,7 +244,7 @@ try {
             $null = New-Item -ItemType File -Path $startedMarker -Force
         }
     }
-    Remove-PostBootTriggers
+    # The cleanup worker removes retry triggers only after successful cleanup.
 } catch {
     throw
 }

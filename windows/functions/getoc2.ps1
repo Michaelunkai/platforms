@@ -4,7 +4,7 @@
 # was copied from. The module is also force-re-imported when the copy
 # loaded in this process is stale (psm1 changed on disk) so a long-
 # running session never runs an outdated dispatcher.
-$__2scProfileModule = 'C:\Users\micha\Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1'
+$__2scProfileModule = 'C:\Users\Admin\Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1'
 $__2scNeedBootstrap = -not (Get-Command -Name 'Initialize-CodexProfileFunctions' -CommandType Function -ErrorAction SilentlyContinue)
 if (-not $__2scNeedBootstrap) {
     $__2scLoadedModule = Get-Module -Name 'CodexProfileFunctions' -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -43,58 +43,298 @@ function getoc2 {
         return ($null -ne $Obj -and $null -ne $Obj.PSObject -and $null -ne $Obj.PSObject.Properties[$Name])
     }
 
-    Write-Output 'GETOC2_PROGRESS stage=starting'
+    function Resolve-OcToolPath {
+        param(
+            [string[]]$Candidates,
+            [string[]]$CommandNames
+        )
 
-    # 1) Force a permanent npm global prefix on the C: drive so opencode
-    #    survives Windows reboots (never a temp/F:-drive location).
-    $npmGlobalPrefix = Join-Path $env:LOCALAPPDATA 'npm-global'
-    New-Item -ItemType Directory -Force -Path $npmGlobalPrefix | Out-Null
-    try { & npm config set prefix $npmGlobalPrefix 2>$null | Out-Null } catch { }
-
-    # Persist the bin directory in the USER-scope PATH (registry-backed),
-    # not just the live session.
-    $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
-    $pathParts = @(($userPath -split ';') | Where-Object { $_.Trim() })
-    if (@($pathParts | Where-Object { $_.TrimEnd('\') -ieq $npmGlobalPrefix.TrimEnd('\') }).Count -eq 0) {
-        [Environment]::SetEnvironmentVariable('Path', (($pathParts + $npmGlobalPrefix) -join ';'), 'User')
+        foreach ($candidate in $Candidates) {
+            if ($candidate -and (Test-Path -LiteralPath $candidate -PathType Leaf)) {
+                return $candidate
+            }
+        }
+        foreach ($commandName in $CommandNames) {
+            foreach ($command in (Get-Command $commandName -All -ErrorAction SilentlyContinue)) {
+                if ($command.Source -and
+                    $command.Source -notmatch 'WindowsApps' -and
+                    (Test-Path -LiteralPath $command.Source -PathType Leaf)) {
+                    return $command.Source
+                }
+            }
+        }
+        return $null
     }
-    $env:Path = ($npmGlobalPrefix + ';' + $env:Path)
 
-    # 2) Install the opencode CLI globally (permanent).
-    Write-Output 'GETOC2_PROGRESS stage=installing-opencode'
-    Invoke-OcRetry { npm install -g opencode-ai | Out-Null }
-
-    # Resolve the installed opencode command.
-    $openCodeCmd = $null
-    foreach ($candidate in @(
-        (Join-Path $npmGlobalPrefix 'opencode.cmd'),
-        (Join-Path $npmGlobalPrefix 'opencode'),
-        (Join-Path ${env:APPDATA} 'npm\opencode.cmd'),
-        (Join-Path ${env:ProgramFiles} 'nodejs\opencode.cmd')
-    )) {
-        if (Test-Path -LiteralPath $candidate -PathType Leaf) { $openCodeCmd = $candidate; break }
+    function Test-OcCommand([string]$Path) {
+        if (-not $Path -or -not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $false }
+        try {
+            $quotedPath = '"{0}"' -f $Path
+            $version = ((& $env:ComSpec /d /s /c "$quotedPath --version 2>&1") -join ' ').Trim()
+            $help = ((& $env:ComSpec /d /s /c "$quotedPath models --help 2>&1") -join "`n") -replace "`e\[[0-9;]*m", ''
+            return ($LASTEXITCODE -eq 0 -and
+                $version -match '^\s*\d+\.\d+\.\d+\s*$' -and
+                $help -match '(?m)^\s*opencode\s+models\b')
+        } catch {
+            return $false
+        }
     }
-    if (-not $openCodeCmd) {
-        $ocCmd = Get-Command opencode -CommandType Application -ErrorAction SilentlyContinue
-        if ($ocCmd) { $openCodeCmd = $ocCmd.Source }
+
+    function Install-OcStableCommand {
+        param(
+            [string[]]$SourceCandidates,
+            [string]$StableRoot
+        )
+
+        $stableExe = Join-Path $StableRoot 'opencode.exe'
+        $stableCmd = Join-Path $StableRoot 'opencode.cmd'
+        if (Test-OcCommand -Path $stableCmd) { return $stableCmd }
+
+        $sourceExe = $null
+        foreach ($candidate in $SourceCandidates) {
+            if (Test-OcCommand -Path $candidate) { $sourceExe = $candidate; break }
+        }
+        if (-not $sourceExe) { return $null }
+
+        New-Item -ItemType Directory -Force -Path $StableRoot | Out-Null
+        $tempExe = Join-Path $StableRoot ("opencode.$PID.tmp.exe")
+        $tempCmd = Join-Path $StableRoot ("opencode.$PID.tmp.cmd")
+        Copy-Item -LiteralPath $sourceExe -Destination $tempExe -Force
+        Move-Item -LiteralPath $tempExe -Destination $stableExe -Force
+        "@echo off`r`n`"%LOCALAPPDATA%\OpenCodeStable\opencode.exe`" %*`r`nexit /b %ERRORLEVEL%`r`n" |
+            Set-Content -LiteralPath $tempCmd -Encoding ASCII
+        Move-Item -LiteralPath $tempCmd -Destination $stableCmd -Force
+        if (-not (Test-OcCommand -Path $stableCmd)) {
+            throw "GETOC2: stable OpenCode command failed verification: $stableCmd"
+        }
+
+        $file = Get-Item -LiteralPath $stableCmd
+        [pscustomobject]@{
+            length = $file.Length
+            lastWriteTimeUtcTicks = $file.LastWriteTimeUtc.Ticks
+            version = ((& $stableCmd --version 2>$null) -join ' ').Trim()
+            identity = 'opencode models'
+        } | ConvertTo-Json | Set-Content -LiteralPath "$stableCmd.verified.json" -Encoding UTF8
+        return $stableCmd
     }
-    if (-not $openCodeCmd) {
-        throw 'GETOC2: opencode CLI installed but no runnable command found on PATH.'
+
+    $nodeExe = Resolve-OcToolPath -Candidates @(
+        (Join-Path ${env:ProgramFiles} 'nodejs\node.exe'),
+        (Join-Path ${env:ProgramFiles(x86)} 'nodejs\node.exe')
+    ) -CommandNames @('node.exe', 'node')
+    $npmCmd = Resolve-OcToolPath -Candidates @(
+        (Join-Path ${env:ProgramFiles} 'nodejs\npm.cmd'),
+        (Join-Path ${env:ProgramFiles(x86)} 'nodejs\npm.cmd'),
+        (Join-Path ${env:APPDATA} 'npm\npm.cmd')
+    ) -CommandNames @('npm.cmd', 'npm')
+    if (-not $nodeExe -or -not $npmCmd) {
+        throw "GETOC2: Node.js/npm is unavailable (node=$nodeExe npm=$npmCmd)."
     }
-    Write-Output "GETOC2_PROGRESS stage=opencode-installed path=$openCodeCmd"
 
-    # 3) Install the OpenCode browser plugin (native messaging host).
-    Write-Output 'GETOC2_PROGRESS stage=installing-browser-plugin'
-    $pkg = '@different-ai/opencode-browser'
-    $ver = '4.6.1'
-    Invoke-OcRetry { npm install -g "$pkg@$ver" --silent | Out-Null }
+    $bootstrapMutex = New-Object Threading.Mutex($false, 'Local\GetOc2BootstrapV2')
+    $bootstrapLockTaken = $false
+    try {
+        try {
+            $bootstrapLockTaken = $bootstrapMutex.WaitOne(300000)
+        } catch [Threading.AbandonedMutexException] {
+            $bootstrapLockTaken = $true
+        }
+        if (-not $bootstrapLockTaken) {
+            throw 'GETOC2: timed out waiting for another OpenCode bootstrap.'
+        }
 
-    $groot = (npm root -g).Trim()
-    $pkgRoot = Join-Path $groot '@different-ai\opencode-browser'
-    if (-not (Test-Path $pkgRoot)) { throw "Package root missing: $pkgRoot" }
+        Write-Output 'GETOC2_PROGRESS stage=starting'
 
-    $base = Join-Path $env:USERPROFILE '.opencode-browser'
-    $extDst = Join-Path $base 'extension'
+        # 1) Force a permanent npm global prefix on the C: drive so opencode
+        #    survives Windows reboots (never a temp/F:-drive location).
+        $npmGlobalPrefix = Join-Path $env:LOCALAPPDATA 'npm-global'
+        $stableRoot = Join-Path $env:LOCALAPPDATA 'OpenCodeStable'
+        $stableCmd = Join-Path $stableRoot 'opencode.cmd'
+        $nodeDirectory = Split-Path -Parent $nodeExe
+        New-Item -ItemType Directory -Force -Path $npmGlobalPrefix | Out-Null
+
+        # Put the real npm/OpenCode paths before WinGet shims. This also repairs
+        # already-open shells whose PATH predates the Node.js installation.
+        $priorityPathEntries = @($npmGlobalPrefix, $nodeDirectory)
+        $processPathParts = @(($env:Path -split ';') | Where-Object {
+            $part = $_.Trim()
+            $part -and @($priorityPathEntries | Where-Object {
+                $_.TrimEnd('\') -ieq $part.TrimEnd('\')
+            }).Count -eq 0
+        })
+        $env:Path = (($priorityPathEntries + $processPathParts) -join ';')
+
+        $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+        $userPathParts = @(($userPath -split ';') | Where-Object {
+            $part = $_.Trim()
+            $part -and @($priorityPathEntries | Where-Object {
+                $_.TrimEnd('\') -ieq $part.TrimEnd('\')
+            }).Count -eq 0
+        })
+        $newUserPath = (($priorityPathEntries + $userPathParts) -join ';')
+        if ($newUserPath -ne $userPath) {
+            [Environment]::SetEnvironmentVariable('Path', $newUserPath, 'User')
+        }
+        & $npmCmd config set prefix $npmGlobalPrefix | Out-Null
+
+        # 2) Install the opencode CLI only when the real command is absent or
+        #    broken. Sessions queued on the mutex re-check here, so only the
+        #    first bootstrap performs network/package work.
+        $openCodeSources = @(
+            (Join-Path $npmGlobalPrefix 'node_modules\opencode-ai\bin\opencode.exe'),
+            (Join-Path $npmGlobalPrefix 'node_modules\opencode-ai\node_modules\opencode-windows-x64\bin\opencode.exe'),
+            (Join-Path $npmGlobalPrefix 'node_modules\opencode-ai\node_modules\opencode-windows-x64-baseline\bin\opencode.exe')
+        )
+        $openCodeCmd = Install-OcStableCommand -SourceCandidates $openCodeSources -StableRoot $stableRoot
+        $openCodeReady = Test-OcCommand -Path $openCodeCmd
+        if (-not $openCodeReady) {
+            $openCodeCmd = Join-Path $npmGlobalPrefix 'opencode.cmd'
+        }
+        if (-not $openCodeReady -and (Test-Path -LiteralPath $openCodeCmd -PathType Leaf)) {
+            try {
+                $openCodeVersion = (& $openCodeCmd --version 2>$null) -join ' '
+                $helpCommand = '"{0}" models --help 2>&1' -f $openCodeCmd
+                $openCodeHelp = ((& $env:ComSpec /d /s /c $helpCommand) -join "`n") -replace "`e\[[0-9;]*m", ''
+                $openCodeReady = ($openCodeVersion -match '^\s*\d+\.\d+\.\d+\s*$' -and
+                    $openCodeHelp -match '(?m)^\s*opencode\s+models\b')
+            } catch {
+                $openCodeReady = $false
+            }
+        }
+        if (-not $openCodeReady) {
+            Write-Output 'GETOC2_PROGRESS stage=installing-opencode'
+            # Install both global packages in one npm transaction. Installing
+            # either package alone can rewrite the shared global prefix and
+            # remove the other package while concurrent launchers are waiting.
+            Invoke-OcRetry { & $npmCmd install -g opencode-ai '@different-ai/opencode-browser@4.6.1' | Out-Null }
+            $openCodeCmd = Install-OcStableCommand -SourceCandidates $openCodeSources -StableRoot $stableRoot
+            $openCodeReady = Test-OcCommand -Path $openCodeCmd
+        } else {
+            Write-Output "GETOC2_PROGRESS stage=opencode-current path=$openCodeCmd version=$openCodeVersion"
+        }
+
+        # Resolve and verify the installed opencode command.
+        $openCodeCmd = $null
+        foreach ($candidate in @(
+            $stableCmd,
+            (Join-Path $npmGlobalPrefix 'opencode.cmd'),
+            (Join-Path $npmGlobalPrefix 'opencode'),
+            (Join-Path ${env:APPDATA} 'npm\opencode.cmd'),
+            (Join-Path ${env:ProgramFiles} 'nodejs\opencode.cmd')
+        )) {
+            if (Test-Path -LiteralPath $candidate -PathType Leaf) { $openCodeCmd = $candidate; break }
+        }
+        if (-not $openCodeCmd) {
+            $ocCmd = Get-Command opencode -CommandType Application -ErrorAction SilentlyContinue
+            if ($ocCmd) { $openCodeCmd = $ocCmd.Source }
+        }
+        if (-not $openCodeCmd) {
+            throw 'GETOC2: opencode CLI installed but no runnable command found on PATH.'
+        }
+        try {
+            $verifiedOpenCodeVersion = (& $openCodeCmd --version 2>$null) -join ' '
+            $helpCommand = '"{0}" models --help 2>&1' -f $openCodeCmd
+            $verifiedOpenCodeHelp = ((& $env:ComSpec /d /s /c $helpCommand) -join "`n") -replace "`e\[[0-9;]*m", ''
+            if ($verifiedOpenCodeVersion -notmatch '^\s*\d+\.\d+\.\d+\s*$' -or
+                $verifiedOpenCodeHelp -notmatch '(?m)^\s*opencode\s+models\b') {
+                throw "unexpected version output: $verifiedOpenCodeVersion"
+            }
+        } catch {
+            throw "GETOC2: installed opencode command is not runnable: $openCodeCmd ($($_.Exception.Message))"
+        }
+        Write-Output "GETOC2_PROGRESS stage=opencode-ready path=$openCodeCmd version=$verifiedOpenCodeVersion"
+
+        # 3) Install the exact browser plugin only when it is absent, incomplete,
+        #    or at the wrong version.
+        $pkg = '@different-ai/opencode-browser'
+        $ver = '4.6.1'
+        $groot = (& $npmCmd root -g).Trim()
+        $pkgRoot = Join-Path $groot '@different-ai\opencode-browser'
+        $pkgJsonPath = Join-Path $pkgRoot 'package.json'
+        $browserPluginReady = $false
+        if (Test-Path -LiteralPath $pkgJsonPath -PathType Leaf) {
+            try {
+                $pkgJson = Get-Content -LiteralPath $pkgJsonPath -Raw | ConvertFrom-Json
+                $browserPluginReady = (
+                    [string]$pkgJson.version -eq $ver -and
+                    (Test-Path -LiteralPath (Join-Path $pkgRoot 'bin\broker.cjs') -PathType Leaf) -and
+                    (Test-Path -LiteralPath (Join-Path $pkgRoot 'bin\native-host.cjs') -PathType Leaf) -and
+                    (Test-Path -LiteralPath (Join-Path $pkgRoot 'extension\manifest.json') -PathType Leaf)
+                )
+            } catch {
+                $browserPluginReady = $false
+            }
+        }
+        if (-not $browserPluginReady) {
+            Write-Output 'GETOC2_PROGRESS stage=installing-browser-plugin'
+            Invoke-OcRetry { & $npmCmd install -g opencode-ai "$pkg@$ver" --silent | Out-Null }
+        } else {
+            Write-Output "GETOC2_PROGRESS stage=browser-plugin-current version=$ver"
+        }
+        if (-not (Test-Path -LiteralPath $pkgRoot -PathType Container)) {
+            throw "Package root missing: $pkgRoot"
+        }
+        # The browser-plugin install shares the npm global prefix. Revalidate
+        # OpenCode after it completes so success can never be reported with a
+        # deleted shim or package.
+        $openCodeCmd = Install-OcStableCommand -SourceCandidates $openCodeSources -StableRoot $stableRoot
+        if (-not (Test-OcCommand -Path $openCodeCmd)) {
+            throw "GETOC2: browser-plugin install left no stable OpenCode command: $stableCmd"
+        }
+        $verifiedOpenCodeVersion = (& $openCodeCmd --version 2>$null) -join ' '
+        if ($verifiedOpenCodeVersion -notmatch '^\s*\d+\.\d+\.\d+\s*$') {
+            throw "GETOC2: OpenCode failed post-plugin verification: $openCodeCmd"
+        }
+
+        $base = Join-Path $env:USERPROFILE '.opencode-browser'
+        $extDst = Join-Path $base 'extension'
+        $hostName = 'com.opencode.browser_automation'
+        $wrapper = Join-Path $base 'host-wrapper.cmd'
+        $nativeManifest = Join-Path $base "$hostName.json"
+        $cfgDir = Join-Path $env:USERPROFILE '.config\opencode'
+        $cfgPath = Join-Path $cfgDir 'opencode.json'
+        $buildPromptPath = Join-Path $cfgDir 'build-prompt.txt'
+
+        # A completed first bootstrap leaves all of these durable receipts.
+        # Waiters can return immediately instead of serially recopying the
+        # extension, touching registry keys, and rewriting JSON.
+        if ($openCodeReady -and $browserPluginReady) {
+            $nativeHostReady = $false
+            $configReady = $false
+            try {
+                $nativeHostJson = Get-Content -LiteralPath $nativeManifest -Raw | ConvertFrom-Json
+                $registeredManifest = (
+                    Get-ItemProperty -LiteralPath "HKCU:\Software\Google\Chrome\NativeMessagingHosts\$hostName" -ErrorAction Stop
+                ).'(default)'
+                $nativeHostReady = (
+                    (Test-Path -LiteralPath $wrapper -PathType Leaf) -and
+                    (Test-Path -LiteralPath (Join-Path $base 'native-host.cjs') -PathType Leaf) -and
+                    (Test-Path -LiteralPath (Join-Path $base 'broker.cjs') -PathType Leaf) -and
+                    (Test-Path -LiteralPath (Join-Path $extDst 'manifest.json') -PathType Leaf) -and
+                    $nativeHostJson.name -eq $hostName -and
+                    $nativeHostJson.path -eq $wrapper -and
+                    $registeredManifest -eq $nativeManifest
+                )
+            } catch {
+                $nativeHostReady = $false
+            }
+            try {
+                $currentConfig = Get-Content -LiteralPath $cfgPath -Raw | ConvertFrom-Json
+                $configReady = (
+                    @($currentConfig.plugin) -contains $pkg -and
+                    (Test-Path -LiteralPath $buildPromptPath -PathType Leaf)
+                )
+            } catch {
+                $configReady = $false
+            }
+            if ($nativeHostReady -and $configReady) {
+                Write-Output "GETOC2_PROGRESS stage=bootstrap-current opencode=$verifiedOpenCodeVersion browser=$ver"
+                Write-Output 'GETOC2_OK'
+                Write-Output "GETOC2_DONE: opencode + browser plugin installed permanently (bin=$npmGlobalPrefix)"
+                return
+            }
+        }
+
     New-Item -ItemType Directory -Force -Path $base, $extDst | Out-Null
     Copy-Item -Recurse -Force (Join-Path $pkgRoot 'extension\*') $extDst
 
@@ -106,8 +346,7 @@ function getoc2 {
     Copy-Item -Force $brokerSrc (Join-Path $base 'broker.cjs')
     Copy-Item -Force $hostSrc (Join-Path $base 'native-host.cjs')
 
-    $node = (Get-Command node -ErrorAction Stop).Source
-    $wrapper = Join-Path $base 'host-wrapper.cmd'
+    $node = $nodeExe
     "@echo off`r`n`"$node`" `"$base\native-host.cjs`"`r`n" | Set-Content -Encoding ASCII $wrapper
 
     $manifestObj = Get-Content -Raw (Join-Path $pkgRoot 'extension\manifest.json') | ConvertFrom-Json
@@ -118,8 +357,6 @@ function getoc2 {
         $hi = [int]($_ -shr 4); $lo = [int]($_ -band 15)
         ([char]([int](97 + $hi))).ToString() + ([char]([int](97 + $lo))).ToString()
     }) -join ''
-    $hostName = 'com.opencode.browser_automation'
-    $nativeManifest = Join-Path $base "$hostName.json"
     [pscustomobject]@{
         name = $hostName
         description = 'OpenCode Browser native messaging host'
@@ -139,8 +376,6 @@ function getoc2 {
 
     # 4) Add the plugin to opencode.json without deleting the existing
     #    NVIDIA provider + API key.
-    $cfgDir = Join-Path $env:USERPROFILE '.config\opencode'
-    $cfgPath = Join-Path $cfgDir 'opencode.json'
     New-Item -ItemType Directory -Force -Path $cfgDir | Out-Null
     $cfg = if (Test-Path $cfgPath) {
         try { Get-Content -Raw $cfgPath | ConvertFrom-Json } catch { [pscustomobject]@{} }
@@ -161,7 +396,6 @@ function getoc2 {
 
     # Ensure the build agent's prompt file exists (referenced by opencode.json)
     # so opencode never refuses to start with a 'bad file reference' error.
-    $buildPromptPath = Join-Path $env:USERPROFILE '.config\opencode\build-prompt.txt'
     if (-not (Test-Path -LiteralPath $buildPromptPath -PathType Leaf)) {
         $buildPromptDir = Split-Path -Parent $buildPromptPath
         if (-not (Test-Path -LiteralPath $buildPromptDir -PathType Container)) {
@@ -187,8 +421,14 @@ Use any tool you need to verify your work. When the task is done, summarize exac
         Write-Host "GETOC2_PROGRESS stage=build-prompt-created path=$buildPromptPath"
     }
 
-    Write-Output 'GETOC2_OK'
-    Write-Output "GETOC2_DONE: opencode + browser plugin installed permanently (bin=$npmGlobalPrefix)"
+        Write-Output 'GETOC2_OK'
+        Write-Output "GETOC2_DONE: opencode + browser plugin installed permanently (bin=$npmGlobalPrefix)"
+    } finally {
+        if ($bootstrapLockTaken) {
+            [void]$bootstrapMutex.ReleaseMutex()
+        }
+        $bootstrapMutex.Dispose()
+    }
 }
 
 

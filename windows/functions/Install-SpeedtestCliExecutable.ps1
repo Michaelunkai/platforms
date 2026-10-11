@@ -4,7 +4,7 @@
 # was copied from. The module is also force-re-imported when the copy
 # loaded in this process is stale (psm1 changed on disk) so a long-
 # running session never runs an outdated dispatcher.
-$__2scProfileModule = 'C:\Users\micha\Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1'
+$__2scProfileModule = (Join-Path $env:USERPROFILE 'Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1')
 $__2scNeedBootstrap = -not (Get-Command -Name 'Initialize-CodexProfileFunctions' -CommandType Function -ErrorAction SilentlyContinue)
 if (-not $__2scNeedBootstrap) {
     $__2scLoadedModule = Get-Module -Name 'CodexProfileFunctions' -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -37,6 +37,8 @@ function Install-SpeedtestCliExecutable {
         Invoke-WebRequest -Uri $url -OutFile $zipPath -UseBasicParsing -ErrorAction Stop
         $actualSha256 = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash.ToUpperInvariant()
         if ($actualSha256 -ne $expectedSha256) { throw "Speedtest CLI download hash mismatch: $actualSha256" }
+        $__codexSafeAddTypePath = 'F:\study\Platforms\windows\functions\Invoke-CodexSafePowerShellAddType.ps1'
+        if ([IO.File]::Exists($__codexSafeAddTypePath)) { . $__codexSafeAddTypePath }
         Add-Type -AssemblyName System.IO.Compression.FileSystem
         New-Item -ItemType Directory -Force -Path $extractRoot | Out-Null
         try {

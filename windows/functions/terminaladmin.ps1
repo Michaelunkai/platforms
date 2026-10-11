@@ -4,7 +4,7 @@
 # was copied from. The module is also force-re-imported when the copy
 # loaded in this process is stale (psm1 changed on disk) so a long-
 # running session never runs an outdated dispatcher.
-$__2scProfileModule = 'C:\Users\micha\Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1'
+$__2scProfileModule = (Join-Path $env:USERPROFILE 'Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1')
 $__2scNeedBootstrap = -not (Get-Command -Name 'Initialize-CodexProfileFunctions' -CommandType Function -ErrorAction SilentlyContinue)
 if (-not $__2scNeedBootstrap) {
     $__2scLoadedModule = Get-Module -Name 'CodexProfileFunctions' -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -33,7 +33,7 @@ function terminaladmin {
         [switch]$NoLaunch
     )
 
-    $toolDirectory = 'C:\Users\micha\.codex\tools\terminal'
+    $toolDirectory = 'C:\Users\Admin\.codex\tools\terminal'
     $repairScript = Join-Path $toolDirectory 'Repair-AdminWindowsTerminal.ps1'
     $launchScript = Join-Path $toolDirectory 'Launch-AdminWindowsTerminal.ps1'
     $windowsPowerShell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'

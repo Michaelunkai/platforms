@@ -4,7 +4,7 @@
 # was copied from. The module is also force-re-imported when the copy
 # loaded in this process is stale (psm1 changed on disk) so a long-
 # running session never runs an outdated dispatcher.
-$__2scProfileModule = 'C:\Users\micha\Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1'
+$__2scProfileModule = (Join-Path $env:USERPROFILE 'Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1')
 $__2scNeedBootstrap = -not (Get-Command -Name 'Initialize-CodexProfileFunctions' -CommandType Function -ErrorAction SilentlyContinue)
 if (-not $__2scNeedBootstrap) {
     $__2scLoadedModule = Get-Module -Name 'CodexProfileFunctions' -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -34,7 +34,7 @@ function Repair-RedockerSafeSettings {
         $settingsJson = Join-Path $dockerRoaming 'settings.json'
         $daemonJson = Join-Path $dotDocker 'daemon.json'
         $windowsDaemonJson = Join-Path $dotDocker 'windows-daemon.json'
-        $fullSettings = "{`n  `"AutoStart`": false,`n  `"DisplayedOnboarding`": true,`n  `"EnableCLIHints`": true,`n  `"EnableDockerAI`": true,`n  `"EnableIntegrationWithDefaultWslDistro`": false,`n  `"FilesharingDirectories`": [`"C:\\\\`", `"E:\\\\`", `"F:\\\\`"],`n  `"InferenceCanUseGPUVariant`": true,`n  `"LicenseTermsVersion`": 2,`n  `"MemoryMiB`": 33792,`n  `"OpenUIOnStartupDisabled`": true,`n  `"SettingsVersion`": 44,`n  `"SwapMiB`": 3072,`n  `"ThemeSource`": `"dark`",`n  `"UseBackgroundIndexing`": false,`n  `"UseContainerdSnapshotter`": true,`n  `"UseVirtualizationFramework`": false,`n  `"WslEngineEnabled`": false`n}"
+        $fullSettings = "{`n  `"AutoStart`": false,`n  `"DisplayedOnboarding`": true,`n  `"EnableCLIHints`": true,`n  `"EnableDockerAI`": true,`n  `"EnableIntegrationWithDefaultWslDistro`": false,`n  `"FilesharingDirectories`": [`"C:\\\\`", `"D:\\\\`", `"E:\\\\`", `"F:\\\\`"],`n  `"InferenceCanUseGPUVariant`": true,`n  `"LicenseTermsVersion`": 2,`n  `"MemoryMiB`": 33792,`n  `"OpenUIOnStartupDisabled`": true,`n  `"SettingsVersion`": 44,`n  `"SwapMiB`": 3072,`n  `"ThemeSource`": `"dark`",`n  `"UseBackgroundIndexing`": false,`n  `"UseContainerdSnapshotter`": true,`n  `"UseVirtualizationFramework`": false,`n  `"WslEngineEnabled`": false`n}"
         $desktopSettings = "{`n  `"WslEngineEnabled`": false,`n  `"UseVirtualizationFramework`": false,`n  `"EnableIntegrationWithDefaultWslDistro`": false,`n  `"AutoStart`": false`n}"
         $daemonSettings = "{`n  `"builder`": {`"gc`": {`"defaultKeepStorage`": `"20GB`", `"enabled`": true}},`n  `"experimental`": false,`n  `"max-concurrent-downloads`": 10,`n  `"max-concurrent-uploads`": 10,`n  `"max-download-attempts`": 5,`n  `"features`": {`"buildkit`": true}`n}"
         $needsFullSettings = $true

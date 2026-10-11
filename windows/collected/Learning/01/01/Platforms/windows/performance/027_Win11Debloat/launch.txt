@@ -1,1 +1,0 @@
-﻿irm https://raw.githubusercontent.com/Raphire/Win11Debloat/master/Get.ps1 | iex

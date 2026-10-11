@@ -4,7 +4,7 @@
 # was copied from. The module is also force-re-imported when the copy
 # loaded in this process is stale (psm1 changed on disk) so a long-
 # running session never runs an outdated dispatcher.
-$__2scProfileModule = 'C:\Users\micha\Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1'
+$__2scProfileModule = (Join-Path $env:USERPROFILE 'Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1')
 $__2scNeedBootstrap = -not (Get-Command -Name 'Initialize-CodexProfileFunctions' -CommandType Function -ErrorAction SilentlyContinue)
 if (-not $__2scNeedBootstrap) {
     $__2scLoadedModule = Get-Module -Name 'CodexProfileFunctions' -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -30,15 +30,15 @@ if ($__2scNeedBootstrap) {
 function backupec2db {
     Initialize-BackupDockerEnvironment
 
-    New-Item -ItemType Directory -Force -Path C:\users\micha\downloads\ec2
-    scp -i "F:\\backup\windowsapps\Credentials\AWS\key.pem" ubuntu@54.173.176.93:/home/ubuntu/study_tracker/study_tracker.db C:\users\micha\downloads\ec2
-    scp -i "F:\\backup\windowsapps\Credentials\AWS\key.pem" ubuntu@54.173.176.93:/home/ubuntu/wishlist/wishlist.db C:\users\micha\downloads\ec2
-    scp -i "F:\\backup\windowsapps\Credentials\AWS\key.pem" ubuntu@54.173.176.93:/home/ubuntu/stickynotes/instance/notes.db C:\users\micha\downloads\ec2
-    cp F:\\study\docker\dockerfiles\buildthispath C:\users\micha\Downloads\ec2\Dockerfile
+    New-Item -ItemType Directory -Force -Path C:\Users\Admin\downloads\ec2
+    scp -i "F:\\backup\windowsapps\Credentials\AWS\key.pem" ubuntu@54.173.176.93:/home/ubuntu/study_tracker/study_tracker.db C:\Users\Admin\downloads\ec2
+    scp -i "F:\\backup\windowsapps\Credentials\AWS\key.pem" ubuntu@54.173.176.93:/home/ubuntu/wishlist/wishlist.db C:\Users\Admin\downloads\ec2
+    scp -i "F:\\backup\windowsapps\Credentials\AWS\key.pem" ubuntu@54.173.176.93:/home/ubuntu/stickynotes/instance/notes.db C:\Users\Admin\downloads\ec2
+    cp F:\\study\docker\dockerfiles\buildthispath C:\Users\Admin\Downloads\ec2\Dockerfile
     $imageRef = Get-BackupDockerNextImageRef -Name 'ec2db'
     Ensure-BackupDockerRepository -Name 'ec2db' | Out-Null
     & "$env:SystemRoot\System32\wsl.exe" -d ubuntu -e sh -c "cd /mnt/f/Users/micha/Downloads/ec2 ; docker build -t $imageRef . ; docker push $imageRef"
-    Remove-Item -Recurse -Force C:\users\micha\downloads\ec2
+    Remove-Item -Recurse -Force C:\Users\Admin\downloads\ec2
 }
 
 if ($MyInvocation.InvocationName -ne '.') {

@@ -1,11 +1,13 @@
 {
-    "StartedAt":  "2026-06-30T03:18:22.7054732+03:00",
-    "LaunchDeadline":  "2026-06-30T03:48:18.9253677+03:00",
+    "StartedAt":  "2026-09-29T23:38:23.2228117+03:00",
+    "LaunchDeadline":  "2026-09-30T00:08:20.3438666+03:00",
     "ExpectedWindowsReturnWithinMinutes":  60,
-    "SetupPath":  "F:\\study\\Platforms\\windows\\system-administration\\scripts\\powershell\\repair\\upgrade\\inplace\\win11\\auto\\runtime\\WinSetup\\setup.exe",
-    "ProcessId":  15352,
-    "Arguments":  "/Auto Upgrade /EULA Accept /DynamicUpdate Enable /MigrateDrivers All /ShowOOBE None /Telemetry Disable /Compat IgnoreWarning /BitLocker AlwaysSuspend",
+    "SetupPath":  "C:\\WinSetupCache\\WinSetup\\setup.exe",
+    "ProcessId":  21852,
+    "Arguments":  "/Auto Upgrade /Quiet /EULA Accept /DynamicUpdate Disable /MigrateDrivers All /ShowOOBE None /Telemetry Disable /Compat IgnoreWarning /BitLocker AlwaysSuspend /PostOOBE \"F:\\study\\Platforms\\windows\\system-administration\\scripts\\powershell\\repair\\upgrade\\inplace\\win11\\auto\\postboot\\setupcomplete.cmd\"",
     "PostBootRoot":  "F:\\study\\Platforms\\windows\\system-administration\\scripts\\powershell\\repair\\upgrade\\inplace\\win11\\auto\\postboot",
     "PostBootCommand":  "c; rrm windows.old",
-    "Status":  "setup.exe-started"
+    "Status":  "launched",
+    "ExitCode":  null,
+    "ExitHex":  null
 }

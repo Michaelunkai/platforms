@@ -4,7 +4,7 @@
 # was copied from. The module is also force-re-imported when the copy
 # loaded in this process is stale (psm1 changed on disk) so a long-
 # running session never runs an outdated dispatcher.
-$__2scProfileModule = 'C:\Users\micha\Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1'
+$__2scProfileModule = Join-Path ([Environment]::GetFolderPath('UserProfile')) 'Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1'
 $__2scNeedBootstrap = -not (Get-Command -Name 'Initialize-CodexProfileFunctions' -CommandType Function -ErrorAction SilentlyContinue)
 if (-not $__2scNeedBootstrap) {
     $__2scLoadedModule = Get-Module -Name 'CodexProfileFunctions' -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -27,7 +27,34 @@ if ($__2scNeedBootstrap) {
     Import-Module -Name $__2scProfileModule -Force -DisableNameChecking -ErrorAction Stop
     Initialize-CodexProfileFunctions
 }
-function qqq {     GDBOOSTER;GCCLEANER }
+function qqq {
+    [CmdletBinding()]
+    param([switch]$SelfTest)
+    if ($SelfTest) {
+        gdbooster -SelfTest
+        gccleaner -SelfTest
+        Write-Host 'QQQ_SELFTEST_OK routes=driverbooster-pro-docker,ccleaner-pro-docker edition=pro fallbackInstaller=false positionalFalseLeak=false' -ForegroundColor Green
+        return
+    }
+    $isAdministrator = ([Security.Principal.WindowsPrincipal]::new([Security.Principal.WindowsIdentity]::GetCurrent())).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+    $ccService = Get-Service -Name 'CCleanerPerformanceOptimizerService' -ErrorAction SilentlyContinue
+    $ccProcesses = @(Get-Process -Name 'CCleaner64','CCleaner','CCleanerPerformanceOptimizerService','CCleanerReactivator' -ErrorAction SilentlyContinue)
+    $ccNeedsElevation = ($ccService -and $ccService.Status -ne 'Stopped') -or $ccProcesses.Count -gt 0
+    $dockerService = Get-Service -Name 'com.docker.service' -ErrorAction SilentlyContinue
+    $dockerNeedsElevation = $dockerService -and $dockerService.Status -ne 'Running'
+    if (-not $isAdministrator -and ($ccNeedsElevation -or $dockerNeedsElevation)) {
+        Write-Host 'QQQ_PROGRESS stage=elevating reason=ccleaner-pro-lock-or-docker-service' -ForegroundColor DarkCyan
+        $elevatedPowerShell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+        $elevated = Start-Process -FilePath $elevatedPowerShell -Verb RunAs -Wait -PassThru -ArgumentList @('-NoLogo', '-ExecutionPolicy', 'Bypass', '-Command', 'try { qqq } catch { Write-Error $_; exit 1 }')
+        if ($elevated.ExitCode -ne 0) { throw "qqq elevated Pro restore failed with exit code $($elevated.ExitCode)." }
+        return
+    }
+    Write-Host 'QQQ_PROGRESS step=1/2 app=driverbooster source=docker-container edition=pro' -ForegroundColor Cyan
+    gdbooster
+    Write-Host 'QQQ_PROGRESS step=2/2 app=ccleaner source=docker-container edition=pro' -ForegroundColor Cyan
+    gccleaner
+    Write-Host 'QQQ_OK apps=2 source=docker-container edition=pro' -ForegroundColor Green
+}
 
 if ($MyInvocation.InvocationName -ne '.') {
     & 'qqq' @args

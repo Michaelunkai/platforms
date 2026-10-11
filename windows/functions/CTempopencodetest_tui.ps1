@@ -1,7 +1,7 @@
 $ErrorActionPreference = 'SilentlyContinue'
 $env:NVIDIA_API_KEY = (Get-Content 'F:\backup\windowsapps\credentials\nvidia\api.txt' -Raw).Trim()
 
-$exe = 'C:\Users\micha\AppData\Local\npm-global\node_modules\opencode-ai\node_modules\opencode-windows-x64\bin\opencode.exe'
+$exe = 'C:\Users\Admin\AppData\Local\npm-global\node_modules\opencode-ai\node_modules\opencode-windows-x64\bin\opencode.exe'
 
 # Try to capture the crash from the TUI by running it briefly
 $pinfo = New-Object System.Diagnostics.ProcessStartInfo

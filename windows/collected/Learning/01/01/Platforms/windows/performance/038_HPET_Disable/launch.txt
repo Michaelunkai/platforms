@@ -1,1 +1,0 @@
-﻿bcdedit /deletevalue useplatformclock; Write-Host "HPET disabled - reboot required"

@@ -4,7 +4,7 @@
 # was copied from. The module is also force-re-imported when the copy
 # loaded in this process is stale (psm1 changed on disk) so a long-
 # running session never runs an outdated dispatcher.
-$__2scProfileModule = 'C:\Users\micha\Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1'
+$__2scProfileModule = (Join-Path $env:USERPROFILE 'Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1')
 $__2scNeedBootstrap = -not (Get-Command -Name 'Initialize-CodexProfileFunctions' -CommandType Function -ErrorAction SilentlyContinue)
 if (-not $__2scNeedBootstrap) {
     $__2scLoadedModule = Get-Module -Name 'CodexProfileFunctions' -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -30,13 +30,13 @@ if ($__2scNeedBootstrap) {
 function backupec2 {
     Initialize-BackupDockerEnvironment
 
-    New-Item -ItemType Directory -Force -Path C:\users\micha\downloads\ec2\apps, C:\users\micha\downloads\ec2\services
-    scp -i "F:\\backup\windowsapps\Credentials\AWS\key.pem" -r ubuntu@54.173.176.93:/home/ubuntu/* C:\users\micha\downloads\ec2\apps
-    scp -i "F:\\backup\windowsapps\Credentials\AWS\key.pem" ubuntu@54.173.176.93:/etc/systemd/system/wishlist.service C:\users\micha\downloads\ec2\services
-    scp -i "F:\\backup\windowsapps\Credentials\AWS\key.pem" ubuntu@54.173.176.93:/etc/systemd/system/stickynotes.service C:\users\micha\downloads\ec2\services
-    scp -i "F:\\backup\windowsapps\Credentials\AWS\key.pem" ubuntu@54.173.176.93:/etc/systemd/system/studytracker.service C:\users\micha\downloads\ec2\services
-    scp -i "F:\\backup\windowsapps\Credentials\AWS\key.pem" ubuntu@54.173.176.93:/etc/systemd/system/speach2text.service C:\users\micha\downloads\ec2\services
-    scp -i "F:\\backup\windowsapps\Credentials\AWS\key.pem" ubuntu@54.173.176.93:/etc/systemd/system/flask_file_explorer.service C:\users\micha\downloads\ec2\services
+    New-Item -ItemType Directory -Force -Path C:\Users\Admin\downloads\ec2\apps, C:\Users\Admin\downloads\ec2\services
+    scp -i "F:\\backup\windowsapps\Credentials\AWS\key.pem" -r ubuntu@54.173.176.93:/home/ubuntu/* C:\Users\Admin\downloads\ec2\apps
+    scp -i "F:\\backup\windowsapps\Credentials\AWS\key.pem" ubuntu@54.173.176.93:/etc/systemd/system/wishlist.service C:\Users\Admin\downloads\ec2\services
+    scp -i "F:\\backup\windowsapps\Credentials\AWS\key.pem" ubuntu@54.173.176.93:/etc/systemd/system/stickynotes.service C:\Users\Admin\downloads\ec2\services
+    scp -i "F:\\backup\windowsapps\Credentials\AWS\key.pem" ubuntu@54.173.176.93:/etc/systemd/system/studytracker.service C:\Users\Admin\downloads\ec2\services
+    scp -i "F:\\backup\windowsapps\Credentials\AWS\key.pem" ubuntu@54.173.176.93:/etc/systemd/system/speach2text.service C:\Users\Admin\downloads\ec2\services
+    scp -i "F:\\backup\windowsapps\Credentials\AWS\key.pem" ubuntu@54.173.176.93:/etc/systemd/system/flask_file_explorer.service C:\Users\Admin\downloads\ec2\services
     $imageRef = Get-BackupDockerNextImageRef -Name 'ec2'
     Ensure-BackupDockerRepository -Name 'ec2' | Out-Null
     & "$env:SystemRoot\System32\wsl.exe" -d ubuntu -e sh -c "cd /mnt/f/Users/micha/Downloads/ec2 ; docker build -t $imageRef . ; docker push $imageRef"

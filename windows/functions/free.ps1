@@ -10,7 +10,7 @@ param(
     [switch]$DryRun
 )
 $ErrorActionPreference = 'Continue'
-$root = 'C:\Users\micha'
+$root = 'C:\Users\Admin'
 $queueFile = Join-Path $root 'a.txt'
 $runnerFile = Join-Path $root 'reboot-run.ps1'
 $openCmd = Join-Path $root 'reboot-open.cmd'

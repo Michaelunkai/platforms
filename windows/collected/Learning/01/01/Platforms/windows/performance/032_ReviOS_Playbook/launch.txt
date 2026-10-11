@@ -1,1 +1,0 @@
-﻿Start-Process "https://revi.cc/"; Write-Host "Download ReviOS Playbook from website"

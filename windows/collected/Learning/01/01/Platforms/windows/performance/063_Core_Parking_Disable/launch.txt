@@ -1,1 +1,0 @@
-﻿powercfg -setacvalueindex SCHEME_CURRENT SUB_PROCESSOR CPMINCORES 100; powercfg -setactive SCHEME_CURRENT; Write-Host "Core parking disabled"

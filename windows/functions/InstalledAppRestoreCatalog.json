@@ -1,0 +1,47 @@
+[
+  {
+    "Folder": "qBittorrentSearchPluginsWiki",
+    "Slug": "qbittorrentsearchpluginswiki",
+    "TargetPath": "F:\\backup\\windowsapps\\installed\\qBittorrentSearchPluginsWiki",
+    "Protected": false,
+    "Kind": "Content",
+    "Path": "Home.md",
+    "Process": null
+  },
+  {
+    "Folder": "GappExactPathProof",
+    "Slug": "gappexactpathproof",
+    "TargetPath": "C:\\Users\\micha\\GappExactPathProof",
+    "Protected": false,
+    "Kind": "Content",
+    "Path": "root.txt",
+    "Process": null
+  },
+  {
+    "Folder": "HereticAI",
+    "Slug": "hereticai",
+    "TargetPath": "F:\\backup\\windowsapps\\installed\\HereticAI",
+    "Protected": false,
+    "Kind": "Command",
+    "Path": "Start Heretic AI.cmd",
+    "Process": null
+  },
+  {
+    "Folder": "WinDirStat",
+    "Slug": "windirstat",
+    "TargetPath": "F:\\backup\\windowsapps\\installed\\WinDirStat",
+    "Protected": false,
+    "Kind": "Exe",
+    "Path": "x64\\WinDirStat.exe",
+    "Process": "WinDirStat.exe"
+  },
+  {
+    "Folder": "Wise Disk Cleaner",
+    "Slug": "wise-disk-cleaner",
+    "TargetPath": "F:\\backup\\windowsapps\\installed\\Wise Disk Cleaner",
+    "Protected": false,
+    "Kind": "Exe",
+    "Path": "WDCFree_11.3.9.859\\WDCFree_11.3.9.859(x64)\\WiseDiskCleaner.exe",
+    "Process": "WiseDiskCleaner.exe"
+  }
+]

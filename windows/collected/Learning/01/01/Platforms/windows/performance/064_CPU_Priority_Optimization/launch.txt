@@ -1,1 +1,0 @@
-﻿Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile" -Name "SystemResponsiveness" -Value 0 -Force; Write-Host "System responsiveness optimized for gaming"

@@ -4,7 +4,7 @@
 # was copied from. The module is also force-re-imported when the copy
 # loaded in this process is stale (psm1 changed on disk) so a long-
 # running session never runs an outdated dispatcher.
-$__2scProfileModule = 'C:\Users\micha\Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1'
+$__2scProfileModule = Join-Path $env:USERPROFILE 'Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1'
 $__2scNeedBootstrap = -not (Get-Command -Name 'Initialize-CodexProfileFunctions' -CommandType Function -ErrorAction SilentlyContinue)
 if (-not $__2scNeedBootstrap) {
     $__2scLoadedModule = Get-Module -Name 'CodexProfileFunctions' -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -48,11 +48,19 @@ function Get-GitlogTokenCandidate {
         return $managerCandidate
     }
 
-    if (Test-Path -LiteralPath $credentialPath) {
+    foreach ($credentialPath in @(
+        'F:\backup\windowsapps\credentials\github\api.txt',
+        (Join-Path ([Environment]::GetFolderPath('UserProfile')) '.git-credentials')
+    )) {
+        if (-not (Test-Path -LiteralPath $credentialPath -PathType Leaf)) { continue }
         $credentialText = [System.IO.File]::ReadAllText($credentialPath)
-        $match = [regex]::Match($credentialText, 'https://[^:]+:([^@]+)@github\.com')
-        if ($match.Success) {
-            return [pscustomobject]@{ Token = $match.Groups[1].Value; Source = '.git-credentials' }
+        $tokenMatch = [regex]::Match($credentialText, '(?m)^\s*((?:github_pat_|ghp_)[A-Za-z0-9_]+)\s*$')
+        if ($tokenMatch.Success) {
+            return [pscustomobject]@{ Token = $tokenMatch.Groups[1].Value; Source = $credentialPath }
+        }
+        $urlMatch = [regex]::Match($credentialText, 'https://[^:]+:([^@\s]+)@github\.com')
+        if ($urlMatch.Success) {
+            return [pscustomobject]@{ Token = $urlMatch.Groups[1].Value; Source = '.git-credentials' }
         }
     }
 

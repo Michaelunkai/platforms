@@ -11,6 +11,14 @@ catch {
 }
 expectedCreated := A_Args[2]
 stateFile := A_Args[3]
+trimMode := A_Args.Length >= 4 ? A_Args[4] : "game_suspend"
+delayMs := 0
+if (A_Args.Length >= 5) {
+    try delayMs := Max(0, Integer(A_Args[5]))
+}
+
+if (delayMs > 0)
+    Sleep(delayMs)
 
 GetCreationStamp(targetPid) {
     hProcess := DllCall("OpenProcess", "UInt", 0x1000, "Int", 0, "UInt", targetPid, "Ptr")
@@ -42,7 +50,7 @@ Loop count {
     }
     if (savedPid = pid
         && IniRead(stateFile, section, "Created", "") = expectedCreated
-        && IniRead(stateFile, section, "Mode", "") = "game_suspend"
+        && IniRead(stateFile, section, "Mode", "") = trimMode
         && IniRead(stateFile, section, "State", "") = "paused") {
         authorized := true
         break
@@ -58,4 +66,5 @@ if (!hProcess) {
 }
 trimmed := DllCall("psapi\EmptyWorkingSet", "Ptr", hProcess, "Int")
 DllCall("CloseHandle", "Ptr", hProcess)
+try FileAppend(A_Now " | Delayed working-set trim PID " pid " mode " trimMode " result " (trimmed ? "OK" : "FAILED") "`n", A_Temp "\\current-ahk-freeze.log")
 ExitApp(trimmed ? 0 : 7)

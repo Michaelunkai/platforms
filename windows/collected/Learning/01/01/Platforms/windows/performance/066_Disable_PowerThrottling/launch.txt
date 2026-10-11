@@ -1,1 +1,0 @@
-﻿Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\Power\PowerThrottling" -Name "PowerThrottlingOff" -Value 1 -Force -ErrorAction SilentlyContinue; Write-Host "Power throttling disabled"

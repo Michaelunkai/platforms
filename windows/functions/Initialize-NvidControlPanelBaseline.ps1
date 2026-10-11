@@ -4,7 +4,7 @@
 # was copied from. The module is also force-re-imported when the copy
 # loaded in this process is stale (psm1 changed on disk) so a long-
 # running session never runs an outdated dispatcher.
-$__2scProfileModule = 'C:\Users\micha\Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1'
+$__2scProfileModule = (Join-Path $env:USERPROFILE 'Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1')
 $__2scNeedBootstrap = -not (Get-Command -Name 'Initialize-CodexProfileFunctions' -CommandType Function -ErrorAction SilentlyContinue)
 if (-not $__2scNeedBootstrap) {
     $__2scLoadedModule = Get-Module -Name 'CodexProfileFunctions' -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -40,13 +40,13 @@ function Initialize-NvidControlPanelBaseline {
             'C:\ProgramData\NVIDIA Corporation\NVIDIA App\NvBackend\config.xml',
             'C:\ProgramData\NVIDIA Corporation\NVIDIA App\NvConfig',
             'C:\ProgramData\NVIDIA Corporation\NVIDIA App\AcceptedEULA.txt',
-            'C:\Users\micha\AppData\Local\NVIDIA Corporation\NVIDIA App\storage.json',
-            'C:\Users\micha\AppData\Local\NVIDIA Corporation\NVIDIA App\overrides.json',
-            'C:\Users\micha\AppData\Local\NVIDIA Corporation\NVIDIA App\NvBackend\config.xml',
-            'C:\Users\micha\AppData\Local\NVIDIA Corporation\NVIDIA App\NvBackend\batteryboost2.json',
-            'C:\Users\micha\AppData\Local\NVIDIA Corporation\NVIDIA App\NvBackend\nis2settings.json',
-            'C:\Users\micha\AppData\Local\NVIDIA Corporation\NVIDIA App\NvBackend\QuietMode2SupportState.json',
-            'C:\Users\micha\AppData\Local\NVIDIA Corporation\NVIDIA App\NvBackend\SHIM.json'
+            'C:\Users\Admin\AppData\Local\NVIDIA Corporation\NVIDIA App\storage.json',
+            'C:\Users\Admin\AppData\Local\NVIDIA Corporation\NVIDIA App\overrides.json',
+            'C:\Users\Admin\AppData\Local\NVIDIA Corporation\NVIDIA App\NvBackend\config.xml',
+            'C:\Users\Admin\AppData\Local\NVIDIA Corporation\NVIDIA App\NvBackend\batteryboost2.json',
+            'C:\Users\Admin\AppData\Local\NVIDIA Corporation\NVIDIA App\NvBackend\nis2settings.json',
+            'C:\Users\Admin\AppData\Local\NVIDIA Corporation\NVIDIA App\NvBackend\QuietMode2SupportState.json',
+            'C:\Users\Admin\AppData\Local\NVIDIA Corporation\NVIDIA App\NvBackend\SHIM.json'
         )
         $copied = @()
         foreach($p in $paths) {

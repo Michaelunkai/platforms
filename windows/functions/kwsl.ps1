@@ -4,7 +4,7 @@
 # was copied from. The module is also force-re-imported when the copy
 # loaded in this process is stale (psm1 changed on disk) so a long-
 # running session never runs an outdated dispatcher.
-$__2scProfileModule = 'C:\Users\micha\Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1'
+$__2scProfileModule = Join-Path $env:USERPROFILE 'Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1'
 $__2scNeedBootstrap = -not (Get-Command -Name 'Initialize-CodexProfileFunctions' -CommandType Function -ErrorAction SilentlyContinue)
 if (-not $__2scNeedBootstrap) {
     $__2scLoadedModule = Get-Module -Name 'CodexProfileFunctions' -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -29,10 +29,17 @@ if ($__2scNeedBootstrap) {
 }
 function kwsl {
     if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-        Start-Process -FilePath "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -Verb RunAs -ArgumentList '-NoProfile -Command "Get-Process wslservice,wsl -ErrorAction SilentlyContinue | Stop-Process -Force; Start-Sleep 2; wsl --shutdown; Write-Host WSL2 force killed"' -Wait
-    } else {
-        Get-Process wslservice,wsl -ErrorAction SilentlyContinue | Stop-Process -Force; Start-Sleep 2; & "$env:SystemRoot\System32\wsl.exe" --shutdown; Write-Host "WSL2 force killed"
+        throw 'kwsl requires an elevated PowerShell session. Open this same terminal as Administrator, then rerun kwsl.'
     }
+
+    Get-Process wslservice,wsl -ErrorAction SilentlyContinue | Stop-Process -Force
+    Start-Sleep -Seconds 2
+    $wslExecutable = Join-Path $env:SystemRoot 'System32\wsl.exe'
+    & $wslExecutable --shutdown
+    $exitCode = $LASTEXITCODE
+    if ($exitCode -ne 0) { throw "kwsl: wsl --shutdown failed with exit code $exitCode." }
+    $global:LASTEXITCODE = $exitCode
+    Write-Host 'WSL2 force killed'
 }
 
 if ($MyInvocation.InvocationName -ne '.') {

@@ -1,1 +1,0 @@
-﻿iwr "https://wj32.org/wp/download/EmptyStandbyList.exe" -OutFile "$env:TEMP\EmptyStandbyList.exe"; Start-Process "$env:TEMP\EmptyStandbyList.exe" -ArgumentList "workingsets" -Verb RunAs

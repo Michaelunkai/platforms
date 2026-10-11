@@ -4,7 +4,7 @@
 # was copied from. The module is also force-re-imported when the copy
 # loaded in this process is stale (psm1 changed on disk) so a long-
 # running session never runs an outdated dispatcher.
-$__2scProfileModule = 'C:\Users\micha\Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1'
+$__2scProfileModule = (Join-Path $env:USERPROFILE 'Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1')
 $__2scNeedBootstrap = -not (Get-Command -Name 'Initialize-CodexProfileFunctions' -CommandType Function -ErrorAction SilentlyContinue)
 if (-not $__2scNeedBootstrap) {
     $__2scLoadedModule = Get-Module -Name 'CodexProfileFunctions' -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -37,7 +37,7 @@ function Invoke-AfitgirlDownloadPolicy {
     )
     $forward = @{}
     foreach ($entry in $PSBoundParameters.GetEnumerator()) { $forward[$entry.Key] = $entry.Value }
-    Invoke-LegacySafeSwitchWrapper -CommandName 'Invoke-AfitgirlDownloadPolicy' -ScriptPath 'C:\Users\micha\Documents\WindowsPowerShell\legacy-safe-functions\Invoke-AfitgirlDownloadPolicy.ps1' -Forward $forward -RemainingArgs $null
+    Invoke-LegacySafeSwitchWrapper -CommandName 'Invoke-AfitgirlDownloadPolicy' -ScriptPath 'C:\Users\Admin\Documents\WindowsPowerShell\legacy-safe-functions\Invoke-AfitgirlDownloadPolicy.ps1' -Forward $forward -RemainingArgs $null
 }
 
 if ($MyInvocation.InvocationName -ne '.') {

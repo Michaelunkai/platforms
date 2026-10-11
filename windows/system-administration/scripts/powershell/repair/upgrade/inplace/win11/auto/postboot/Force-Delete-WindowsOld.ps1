@@ -123,4 +123,25 @@ if (Test-Path -LiteralPath $target) {
 Remove-PostBootTriggers
 Remove-SystemTask
 Write-CleanupLog 'DONE target absent'
+# agent3 wipe insert (applied 2026-09-29; see runtime\agent3-wipe-insert.txt; backtick-escaped: lives inside  @"..."@ block).
+$winlogonKey = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon'
+Write-CleanupLog 'WIPE autologon begin'
+Remove-ItemProperty -Path $winlogonKey -Name 'DefaultPassword' -Force -ErrorAction SilentlyContinue
+Write-CleanupLog 'WIPE DefaultPassword removed'
+Set-ItemProperty -Path $winlogonKey -Name 'AutoAdminLogon' -Value '0' -Force -ErrorAction SilentlyContinue
+Write-CleanupLog 'WIPE AutoAdminLogon=0'
+Remove-ItemProperty -Path $winlogonKey -Name 'AutoLogonCount' -Force -ErrorAction SilentlyContinue
+Write-CleanupLog 'WIPE AutoLogonCount removed'
+$cleanedPath = Join-Path (Split-Path -Parent $PSCommandPath) 'autologon-cleaned.json'
+$readyMarker = Join-Path (Split-Path -Parent $PSCommandPath) 'desktop-ready.marker'
+$cleaned = [ordered]@{
+    Timestamp = (Get-Date -Format s)
+    DefaultPasswordRemoved = $true
+    AutoAdminLogon = '0'
+    AutoLogonCountRemoved = $true
+}
+$cleaned | ConvertTo-Json -Depth 3 | Set-Content -LiteralPath $cleanedPath -Encoding ASCII -Force
+$null = New-Item -ItemType File -Path $readyMarker -Force
+Write-CleanupLog ('WIPE markers cleaned=' + $cleanedPath + ' ready=' + $readyMarker)
+Write-CleanupLog 'DONE autologon wiped; desktop-ready marked'
 exit 0

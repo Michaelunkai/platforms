@@ -1,1 +1,0 @@
-﻿Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\DeviceGuard" -Name "EnableVirtualizationBasedSecurity" -Value 0 -Force; Write-Host "VBS disabled - reboot required"

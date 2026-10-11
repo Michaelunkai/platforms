@@ -4,7 +4,7 @@
 # was copied from. The module is also force-re-imported when the copy
 # loaded in this process is stale (psm1 changed on disk) so a long-
 # running session never runs an outdated dispatcher.
-$__2scProfileModule = 'C:\Users\micha\Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1'
+$__2scProfileModule = (Join-Path $env:USERPROFILE 'Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1')
 $__2scNeedBootstrap = -not (Get-Command -Name 'Initialize-CodexProfileFunctions' -CommandType Function -ErrorAction SilentlyContinue)
 if (-not $__2scNeedBootstrap) {
     $__2scLoadedModule = Get-Module -Name 'CodexProfileFunctions' -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -32,9 +32,20 @@ function gitit {
     if (-not $GititArgs -or $GititArgs.Count -eq 0) {
         $GititArgs = @((Get-Location).ProviderPath)
     }
-    python "F:\study\Version_Control\git\gitit\a.py" @GititArgs
+    $script:gititLastExit = 0
+    try {
+        python "F:\study\Version_Control\git\gitit\a.py" @GititArgs
+        $script:gititLastExit = $LASTEXITCODE
+        if ($script:gititLastExit -eq $null) { $script:gititLastExit = 0 }
+    } catch {
+        Write-Error $_
+        $script:gititLastExit = 1
+    }
+    $global:LASTEXITCODE = $script:gititLastExit
+    return $script:gititLastExit
 }
 
 if ($MyInvocation.InvocationName -ne '.') {
     & 'gitit' @args
+    exit $gititLastExit
 }

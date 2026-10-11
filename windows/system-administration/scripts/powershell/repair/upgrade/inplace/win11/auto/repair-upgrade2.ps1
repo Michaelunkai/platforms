@@ -6,7 +6,8 @@
 param(
     [string]$IsoSource = "E:\isos\Windows.iso",
     [string]$ExtractDir = "C:\WinSetup",
-    [string]$LocalIso = "C:\WinISO\Windows.iso"
+    [string]$LocalIso = "C:\WinISO\Windows.iso",
+    [switch]$FastRepair
 )
 
 $ErrorActionPreference = 'Stop'
@@ -14,7 +15,72 @@ $host.UI.RawUI.WindowTitle = "Repair Upgrade - Automated"
 
 function Write-Step($n, $msg) { Write-Host "`n[$n] $msg" -ForegroundColor Cyan }
 function Write-Ok($msg)      { Write-Host "    [OK] $msg" -ForegroundColor Green }
+function Write-Warn($msg)    { Write-Host "    [WARN] $msg" -ForegroundColor Yellow }
 function Write-Fail($msg)    { Write-Host "    [FAIL] $msg" -ForegroundColor Red; throw $msg }
+function Stop-ServiceBounded {
+    param(
+        [Parameter(Mandatory = $true)][string]$Name,
+        [int]$TimeoutSeconds = 30,
+        [int]$GraceSeconds = 8
+    )
+    $svc = Get-Service -Name $Name -EA SilentlyContinue
+    if (-not $svc -or $svc.Status -eq 'Stopped') { return }
+    try {
+        Stop-Service -Name $Name -Force -NoWait -EA SilentlyContinue
+    } catch { }
+
+    # Short grace period for a normal stop before resorting to force-kill.
+    $graceDeadline = (Get-Date).AddSeconds([math]::Min($GraceSeconds, $TimeoutSeconds))
+    while ((Get-Date) -lt $graceDeadline) {
+        $svc = Get-Service -Name $Name -EA SilentlyContinue
+        if (-not $svc -or $svc.Status -eq 'Stopped') { return }
+        Start-Sleep -Milliseconds 500
+    }
+
+    # Stuck (e.g. StopPending): force-kill the hosting process so the state resolves.
+    $svc = Get-Service -Name $Name -EA SilentlyContinue
+    if ($svc -and $svc.Status -ne 'Stopped') {
+        $procId = $null
+        try {
+            $winSvc = Get-CimInstance Win32_Service -Filter "Name='$Name'" -EA SilentlyContinue
+            if ($winSvc -and $winSvc.ProcessId -gt 0) { $procId = [int]$winSvc.ProcessId }
+        } catch { }
+        if ($procId) {
+            Stop-Process -Id $procId -Force -EA SilentlyContinue
+            Write-Warn "$Name was stuck in '$($svc.Status)'; terminated its hosting process (PID $procId)."
+        }
+    }
+
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    while ((Get-Date) -lt $deadline) {
+        $svc = Get-Service -Name $Name -EA SilentlyContinue
+        if (-not $svc -or $svc.Status -eq 'Stopped') { return }
+        Start-Sleep -Milliseconds 500
+    }
+    $svc = Get-Service -Name $Name -EA SilentlyContinue
+    if ($svc -and $svc.Status -ne 'Stopped') {
+        Write-Warn "$Name did not stop within $TimeoutSeconds seconds; continuing anyway."
+    }
+}
+function Start-ServiceBounded {
+    param(
+        [Parameter(Mandatory = $true)][string]$Name,
+        [int]$TimeoutSeconds = 30
+    )
+    $svc = Get-Service -Name $Name -EA SilentlyContinue
+    if (-not $svc -or $svc.Status -eq 'Running') { return }
+    try { Start-Service -Name $Name -EA SilentlyContinue } catch { }
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    while ((Get-Date) -lt $deadline) {
+        $svc = Get-Service -Name $Name -EA SilentlyContinue
+        if ($svc -and $svc.Status -eq 'Running') { return }
+        Start-Sleep -Milliseconds 500
+    }
+    $svc = Get-Service -Name $Name -EA SilentlyContinue
+    if ($svc -and $svc.Status -ne 'Running') {
+        Write-Warn "$Name did not reach Running state within $TimeoutSeconds seconds; continuing anyway."
+    }
+}
 function Get-PendingFileRenameOperationsValue {
     $sessionManager = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager' -Name PendingFileRenameOperations -EA SilentlyContinue
     if (-not $sessionManager) { return $null }
@@ -223,6 +289,78 @@ function Resolve-InstallMediaPath($Candidate, $Reason) {
         return [pscustomobject]@{ Kind = "IsoFile"; Path = $isoInFolder.FullName; Reason = "$Reason (ISO in folder)" }
     }
     return $null
+}
+
+# --- FAST PATH: Skip all prep/servicing/scan; mount ISO and launch immediately ---
+if ($FastRepair) {
+    Write-Host "`n[FAST] Repair upgrade fast path: skipping all pre-steps." -ForegroundColor Cyan
+
+    $fastIso = $null
+    foreach ($candidate in @($IsoSource, $LocalIso)) {
+        if ($candidate -and (Test-Path -LiteralPath $candidate)) { $fastIso = (Get-Item -LiteralPath $candidate -Force).FullName; break }
+    }
+    if (-not $fastIso) { Write-Fail "No ISO found for fast repair (checked $IsoSource, $LocalIso)." }
+    Write-Ok "Using ISO: $fastIso"
+
+    $mediaRoot = $null
+    $alreadyMounted = $null
+    try {
+        $alreadyMounted = Get-DiskImage -ImagePath $fastIso -EA SilentlyContinue | Get-Volume -EA SilentlyContinue
+    } catch { }
+    if ($alreadyMounted -and $alreadyMounted.DriveLetter) {
+        $mediaRoot = "${($alreadyMounted.DriveLetter)}:\"
+        Write-Ok "ISO already mounted at $mediaRoot; reusing it."
+    } else {
+        Write-Host "    Mounting ISO..." -ForegroundColor Cyan
+        try { Dismount-DiskImage $fastIso -EA SilentlyContinue | Out-Null } catch { }
+        $mount = Mount-DiskImage $fastIso -PassThru -EA Stop
+        $mountStart = Get-Date
+        while (((Get-Date) - $mountStart).TotalSeconds -lt 60) {
+            Start-Sleep -Milliseconds 500
+            $vol = $mount | Get-Volume -EA SilentlyContinue
+            if ($vol.DriveLetter) {
+                $mediaRoot = "${($vol.DriveLetter)}:\"
+                Write-Ok "Mounted at ${($vol.DriveLetter)}:"
+                break
+            }
+        }
+        if (-not $mediaRoot) { Write-Fail "ISO mounted but no drive letter assigned after 60 seconds." }
+    }
+
+    $fastSetup = Join-Path $ExtractDir 'setup.exe'
+    if (-not (Test-Path -LiteralPath $fastSetup)) {
+        Write-Host "    Extracting media to $ExtractDir (setup.exe not present)..." -ForegroundColor Cyan
+        New-Item -ItemType Directory -Path $ExtractDir -Force | Out-Null
+        $rc = robocopy $mediaRoot $ExtractDir /E /MT:8 /R:1 /W:1 /NFL /NDL /NJH /NJS /NP
+        if (-not (Test-Path -LiteralPath $fastSetup)) { Write-Fail "setup.exe not found after extraction at $fastSetup" }
+        Write-Ok "Extracted media to $ExtractDir"
+    } else {
+        Write-Ok "Reusing extracted media at $ExtractDir"
+    }
+
+    Write-Step "FAST" "Launching repair upgrade immediately"
+    $setupArgs = "/Auto Upgrade /Quiet /DynamicUpdate NoDrivers /MigrateDrivers All /BitLocker AlwaysSuspend /ShowOOBE None /Telemetry Disable /Compat IgnoreWarning /EULA Accept /CopyLogs `"$ExtractDir\Logs`""
+    Write-Host "    /Auto Upgrade /Quiet /MigrateDrivers All /ShowOOBE None /Compat IgnoreWarning /EULA Accept" -ForegroundColor White
+    $proc = Start-Process $fastSetup -ArgumentList $setupArgs -PassThru
+    Write-Ok "setup.exe started as PID $($proc.Id)"
+    $setupTimeout = 28800; $startTime = Get-Date
+    while (-not $proc.HasExited) {
+        $elapsed = ((Get-Date) - $startTime).TotalSeconds
+        if ($elapsed -gt $setupTimeout) {
+            Stop-Process -Id $proc.Id -Force -EA SilentlyContinue
+            Write-Fail "Setup exceeded 8 hours; terminated."
+        }
+        $h = [math]::Floor($elapsed / 3600); $m = [math]::Floor(($elapsed % 3600) / 60); $s = [math]::Floor($elapsed % 60)
+        Write-Host "`r    Running: ${h}h ${m}m ${s}s | PID $($proc.Id)" -NoNewline -ForegroundColor Cyan
+        Start-Sleep -Milliseconds 1000
+    }
+    Write-Host ""
+    $proc.WaitForExit()
+    $exitCode = $proc.ExitCode
+    Write-Host "`n    Setup exited with code: $exitCode" -ForegroundColor $(if ($exitCode -eq 0) { 'Green' } else { 'Red' })
+    if ($exitCode -eq 0) { Write-Ok "Repair upgrade COMPLETED SUCCESSFULLY" }
+    else { Write-Fail "Repair upgrade failed with exit code $exitCode. See $ExtractDir\Logs." }
+    return
 }
 
 # --- STEP 0: Download latest Windows 11 build from cloud ---
@@ -466,6 +604,7 @@ $extractStart = Get-Date
 $lastBytes = 0.0
 $lastTick = $extractStart
 $process = Start-Process robocopy -ArgumentList $mediaRoot, $ExtractDir, "/E", "/MT:8", "/R:1", "/W:1", "/NFL", "/NDL", "/NJH", "/NJS", "/NP" -NoNewWindow -PassThru -RedirectStandardOutput "$env:TEMP\robocopy.log"
+$extractTimeoutSeconds = 3600
 while (-not $process.HasExited) {
     $destStats = Get-ChildItem -LiteralPath $ExtractDir -Recurse -File -EA SilentlyContinue | Measure-Object -Property Length -Sum
     $copiedBytes = if ($destStats.Sum) { [double]$destStats.Sum } else { 0.0 }
@@ -476,6 +615,10 @@ while (-not $process.HasExited) {
     $speedMBs = ($deltaBytes / 1MB) / $deltaSeconds
     $pct = if ($sourceTotalBytes -gt 0) { [math]::Min([math]::Round(($copiedBytes / $sourceTotalBytes) * 100, 1), 100.0) } else { 0.0 }
     $elapsed = ($now - $extractStart).TotalSeconds
+    if ($elapsed -gt $extractTimeoutSeconds) {
+        Stop-Process -Id $process.Id -Force -EA SilentlyContinue
+        Write-Fail "Extraction timed out after $([math]::Round($extractTimeoutSeconds / 60, 1)) minutes."
+    }
     $remainingBytes = [math]::Max(($sourceTotalBytes - $copiedBytes), 0.0)
     $etaSeconds = if ($speedMBs -gt 0.05) { [math]::Round($remainingBytes / ($speedMBs * 1MB), 0) } else { -1 }
     $etaText = if ($etaSeconds -ge 0) { "{0}m {1}s" -f ([math]::Floor($etaSeconds / 60)), ([math]::Floor($etaSeconds % 60)) } else { "calculating" }
@@ -640,7 +783,7 @@ Write-Step 8 "Stop IIS services"
 foreach ($svc in @('W3SVC','WAS','IISADMIN')) {
     $s = Get-Service $svc -EA SilentlyContinue
     if ($s -and $s.Status -eq 'Running') {
-        Stop-Service $svc -Force -EA SilentlyContinue
+        Stop-ServiceBounded -Name $svc -TimeoutSeconds 20
         Write-Ok "Stopped $svc"
     }
 }
@@ -661,11 +804,15 @@ foreach ($r in $required) {
     Write-Host "`r    [$serviceCount/$($required.Count)] Configuring $($r.Name)..." -NoNewline -ForegroundColor Cyan
     if ($s) {
         Set-Service $r.Name -StartupType $r.Startup -EA SilentlyContinue
+        if ($s.Status -notin @('Stopped', 'Running')) {
+            Stop-ServiceBounded -Name $r.Name -TimeoutSeconds 20 -GraceSeconds 5
+            $s = Get-Service $r.Name -EA SilentlyContinue
+        }
         $startTime = Get-Date
         $timeout = 30
         while (((Get-Date) - $startTime).TotalSeconds -lt $timeout) {
             if ($s.Status -ne 'Running') {
-                Start-Service $r.Name -EA SilentlyContinue
+                Start-ServiceBounded -Name $r.Name -TimeoutSeconds 10
                 Start-Sleep -Milliseconds 500
             }
             $s = Get-Service $r.Name -EA SilentlyContinue
@@ -710,10 +857,35 @@ Write-Step 11 "Repair servicing stack and Windows Update components"
 $wuServices = @('wuauserv', 'BITS', 'cryptsvc', 'msiserver', 'UsoSvc', 'DoSvc')
 foreach ($svc in $wuServices) {
     $service = Get-Service -Name $svc -EA SilentlyContinue
-    if ($service -and $service.Status -eq 'Running') {
-        Stop-Service -Name $svc -Force -EA SilentlyContinue
-        Write-Ok "Stopped $svc"
+    if ($service -and $service.Status -ne 'Stopped') {
+        Stop-ServiceBounded -Name $svc -TimeoutSeconds 30
+        $after = Get-Service -Name $svc -EA SilentlyContinue
+        if ($after -and $after.Status -eq 'Stopped') { Write-Ok "Stopped $svc" }
+        else { Write-Warn "$svc is '$($after.Status)'; update cache reset may be incomplete for this service." }
     }
+}
+
+function Reset-RepairUpgradeFolder {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$BackupPath,
+        [string]$Label,
+        [string[]]$LockingServices = @(),
+        [int]$MaxAttempts = 3
+    )
+    if (-not (Test-Path -LiteralPath $Path)) { return $true }
+    for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
+        try {
+            Move-Item -LiteralPath $Path -Destination $BackupPath -Force -EA Stop
+            return $true
+        } catch {
+            if ($attempt -ge $MaxAttempts) { break }
+            foreach ($svc in $LockingServices) { Stop-ServiceBounded -Name $svc -TimeoutSeconds 20 -GraceSeconds 5 }
+            Start-Sleep -Seconds 2
+        }
+    }
+    Write-Warn "Could not reset $Label ($Path) after $MaxAttempts attempts; continuing with existing folder."
+    return $false
 }
 
 $stamp = Get-Date -Format 'yyyyMMddHHmmss'
@@ -721,29 +893,11 @@ $softwareDistribution = "C:\Windows\SoftwareDistribution"
 $softwareDistributionBak = "C:\Windows\SoftwareDistribution.bak.$stamp"
 $catroot2 = "C:\Windows\System32\catroot2"
 $catroot2Bak = "C:\Windows\System32\catroot2.bak.$stamp"
-if (Test-Path $softwareDistribution) {
-    try {
-        Move-Item -Path $softwareDistribution -Destination $softwareDistributionBak -Force -EA Stop
-    } catch {
-        if (Test-Path $softwareDistribution) {
-            Write-Fail "Failed to reset SoftwareDistribution. Ensure update services are stopped and try again."
-        }
-    }
-    if (Test-Path $softwareDistributionBak) {
-        Write-Ok "Reset SoftwareDistribution -> $softwareDistributionBak"
-    }
+if (Reset-RepairUpgradeFolder -Path $softwareDistribution -BackupPath $softwareDistributionBak -Label 'SoftwareDistribution' -LockingServices @('wuauserv','BITS','DoSvc','UsoSvc')) {
+    Write-Ok "Reset SoftwareDistribution -> $softwareDistributionBak"
 }
-if (Test-Path $catroot2) {
-    try {
-        Move-Item -Path $catroot2 -Destination $catroot2Bak -Force -EA Stop
-    } catch {
-        if (Test-Path $catroot2) {
-            Write-Fail "Failed to reset catroot2. Ensure cryptsvc is stopped and try again."
-        }
-    }
-    if (Test-Path $catroot2Bak) {
-        Write-Ok "Reset catroot2 -> $catroot2Bak"
-    }
+if (Reset-RepairUpgradeFolder -Path $catroot2 -BackupPath $catroot2Bak -Label 'catroot2' -LockingServices @('cryptsvc')) {
+    Write-Ok "Reset catroot2 -> $catroot2Bak"
 }
 
 $bitsQueuePath = Join-Path $env:ProgramData 'Microsoft\Network\Downloader'
@@ -760,13 +914,13 @@ if (Test-Path $doCachePath) {
 foreach ($svc in $wuServices) {
     $service = Get-Service -Name $svc -EA SilentlyContinue
     if ($service) {
-        Start-Service -Name $svc -EA SilentlyContinue
+        Start-ServiceBounded -Name $svc -TimeoutSeconds 30
     }
 }
 foreach ($svc in @('wuauserv', 'BITS', 'cryptsvc')) {
     $state = (Get-Service -Name $svc -EA SilentlyContinue).Status
     if ($state -ne 'Running') {
-        Write-Fail "$svc did not return to Running state after component reset."
+        Write-Warn "$svc did not return to Running state after component reset; continuing anyway."
     }
 }
 

@@ -4,7 +4,7 @@
 # was copied from. The module is also force-re-imported when the copy
 # loaded in this process is stale (psm1 changed on disk) so a long-
 # running session never runs an outdated dispatcher.
-$__2scProfileModule = 'C:\Users\micha\Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1'
+$__2scProfileModule = (Join-Path $env:USERPROFILE 'Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1')
 $__2scNeedBootstrap = -not (Get-Command -Name 'Initialize-CodexProfileFunctions' -CommandType Function -ErrorAction SilentlyContinue)
 if (-not $__2scNeedBootstrap) {
     $__2scLoadedModule = Get-Module -Name 'CodexProfileFunctions' -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -33,14 +33,14 @@ function Invoke-CcccTurboOriginalProfileChild {
         [Parameter(Mandatory=$true)][string]$Name,
         [int]$TimeoutSeconds = 45,
         [object[]]$Arguments = @(),
-        [string]$ProfileLibrary = 'C:\Users\micha\Documents\WindowsPowerShell\ProfileSources\ps5-profile-portable\Microsoft.PowerShell_profile.full.definitions.ps1'
+        [string]$ProfileLibrary = 'C:\Users\Admin\Documents\WindowsPowerShell\ProfileSources\ps5-profile-portable\Microsoft.PowerShell_profile.full.definitions.ps1'
     )
     $ps5 = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
     if (-not (Test-Path -LiteralPath $ps5 -PathType Leaf)) {
         throw "Windows PowerShell 5 executable not found: $ps5"
     }
     if (-not (Test-Path -LiteralPath $ProfileLibrary -PathType Leaf)) {
-        $ProfileLibrary = 'C:\Users\micha\Documents\WindowsPowerShell\ProfileSources\ps5-profile-portable\Microsoft.PowerShell_profile.full.ps1'
+        $ProfileLibrary = 'C:\Users\Admin\Documents\WindowsPowerShell\ProfileSources\ps5-profile-portable\Microsoft.PowerShell_profile.full.ps1'
     }
     if (-not (Test-Path -LiteralPath $ProfileLibrary -PathType Leaf)) {
         throw "Full profile definitions not found: $ProfileLibrary"

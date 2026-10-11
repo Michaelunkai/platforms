@@ -4,7 +4,7 @@
 # was copied from. The module is also force-re-imported when the copy
 # loaded in this process is stale (psm1 changed on disk) so a long-
 # running session never runs an outdated dispatcher.
-$__2scProfileModule = 'C:\Users\micha\Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1'
+$__2scProfileModule = (Join-Path $env:USERPROFILE 'Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1')
 $__2scNeedBootstrap = -not (Get-Command -Name 'Initialize-CodexProfileFunctions' -CommandType Function -ErrorAction SilentlyContinue)
 if (-not $__2scNeedBootstrap) {
     $__2scLoadedModule = Get-Module -Name 'CodexProfileFunctions' -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -37,14 +37,14 @@ function Invoke-NvidLastChanceRuntimeRepair {
             if ($svcObj) { Write-NvidStep ("service {0} status {1}" -f $svcName,$svcObj.Status) }
         }
         foreach($cacheDir in @(
-            'C:\Users\micha\AppData\Local\NVIDIA\DXCache',
-            'C:\Users\micha\AppData\Local\NVIDIA\GLCache',
-            'C:\Users\micha\AppData\Local\NVIDIA\ComputeCache',
-            'C:\Users\micha\AppData\Local\NVIDIA Corporation\NVIDIA App\CefCache',
-            'C:\Users\micha\AppData\Local\NVIDIA Corporation\NVIDIA App\GPUCache',
-            'C:\Users\micha\AppData\Local\NVIDIA Corporation\NVIDIA App\DawnCache',
-            'C:\Users\micha\AppData\Local\NVIDIA Corporation\NVIDIA App\UXD',
-            'C:\Users\micha\AppData\Local\NVIDIA Corporation\NVIDIA App\NvBackend',
+            'C:\Users\Admin\AppData\Local\NVIDIA\DXCache',
+            'C:\Users\Admin\AppData\Local\NVIDIA\GLCache',
+            'C:\Users\Admin\AppData\Local\NVIDIA\ComputeCache',
+            'C:\Users\Admin\AppData\Local\NVIDIA Corporation\NVIDIA App\CefCache',
+            'C:\Users\Admin\AppData\Local\NVIDIA Corporation\NVIDIA App\GPUCache',
+            'C:\Users\Admin\AppData\Local\NVIDIA Corporation\NVIDIA App\DawnCache',
+            'C:\Users\Admin\AppData\Local\NVIDIA Corporation\NVIDIA App\UXD',
+            'C:\Users\Admin\AppData\Local\NVIDIA Corporation\NVIDIA App\NvBackend',
             'C:\ProgramData\NVIDIA Corporation\NVIDIA App\MessageBus'
         )) { Backup-And-ClearDirectory $cacheDir 'lastchance-cache' }
         try {

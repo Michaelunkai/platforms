@@ -1,1 +1,0 @@
-﻿Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management" -Name "PoolUsageMaximum" -Value 60 -Force; Write-Host "Pool usage maximum optimized"

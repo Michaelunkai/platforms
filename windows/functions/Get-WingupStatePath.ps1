@@ -4,7 +4,7 @@
 # was copied from. The module is also force-re-imported when the copy
 # loaded in this process is stale (psm1 changed on disk) so a long-
 # running session never runs an outdated dispatcher.
-$__2scProfileModule = 'C:\Users\micha\Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1'
+$__2scProfileModule = (Join-Path $env:USERPROFILE 'Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1')
 $__2scNeedBootstrap = -not (Get-Command -Name 'Initialize-CodexProfileFunctions' -CommandType Function -ErrorAction SilentlyContinue)
 if (-not $__2scNeedBootstrap) {
     $__2scLoadedModule = Get-Module -Name 'CodexProfileFunctions' -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -28,7 +28,7 @@ if ($__2scNeedBootstrap) {
     Initialize-CodexProfileFunctions
 }
 function Get-WingupStatePath {
-        $helper = 'C:\Users\micha\.codex\scripts\Get-CodexAutomationMemoryPath.ps1'
+        $helper = 'C:\Users\Admin\.codex\scripts\Get-CodexAutomationMemoryPath.ps1'
         if (Test-Path $helper) {
             $memoryPath = & $helper -AutomationId 'wingup' -Ensure | Select-Object -Last 1
             if ($memoryPath) {
@@ -42,7 +42,7 @@ function Get-WingupStatePath {
         $codexHome = if ($env:CODEX_HOME -and -not [string]::IsNullOrWhiteSpace($env:CODEX_HOME)) {
             $env:CODEX_HOME
         } else {
-            'C:\Users\micha\.codex'
+            'C:\Users\Admin\.codex'
         }
         $automationDir = Join-Path $codexHome 'automations\wingup'
         if (-not (Test-Path $automationDir)) {

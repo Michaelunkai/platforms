@@ -1,1 +1,0 @@
-﻿Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management" -Name "SecondLevelDataCache" -Value 1024 -Force; Write-Host "L2 cache size set"

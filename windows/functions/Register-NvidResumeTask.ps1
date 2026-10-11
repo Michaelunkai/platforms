@@ -4,7 +4,7 @@
 # was copied from. The module is also force-re-imported when the copy
 # loaded in this process is stale (psm1 changed on disk) so a long-
 # running session never runs an outdated dispatcher.
-$__2scProfileModule = 'C:\Users\micha\Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1'
+$__2scProfileModule = (Join-Path $env:USERPROFILE 'Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1')
 $__2scNeedBootstrap = -not (Get-Command -Name 'Initialize-CodexProfileFunctions' -CommandType Function -ErrorAction SilentlyContinue)
 if (-not $__2scNeedBootstrap) {
     $__2scLoadedModule = Get-Module -Name 'CodexProfileFunctions' -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -29,7 +29,7 @@ if ($__2scNeedBootstrap) {
 }
 function Register-NvidResumeTask {
     $taskName = 'NVID-Resume-AfterReboot'
-    $profilePath = 'C:\Users\micha\Documents\WindowsPowerShell\Microsoft.PowerShell_profile.ps1'
+    $profilePath = 'C:\Users\Admin\Documents\WindowsPowerShell\Microsoft.PowerShell_profile.ps1'
     $arguments = '-NoLogo -ExecutionPolicy Bypass -Command "& {{ . ''{0}''; nvid }}"' -f $profilePath
     $action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $arguments
     $trigger = New-ScheduledTaskTrigger -AtLogOn

@@ -1,0 +1,19 @@
+# agent3-rearm-insert.txt - INSERT AFTER repair-upgrade.ps1 line 1576
+# (after: Register-PostBootScheduledTask -TaskName $taskNameRetry -RunnerPath $runnerPath -UserId $currentUserId -Retry)
+# DO NOT edit repair-upgrade.ps1 here; integrator applies this block at the anchor.
+# Exact 15-line block below (lines starting with 4-space indent):
+    $rearmTaskName = 'WinSetupPostBootReArmSystem'
+    schtasks.exe /Delete /TN $rearmTaskName /F >$null 2>$null
+    $rearmScriptPath = Join-Path $postBootRoot 'ReArm-System.ps1'
+    $rearmCmdPath = Join-Path $env:SystemRoot 'System32\cmd.exe'
+    $rearmTaskArgs = "/d /c `"$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe`" -NoProfile -ExecutionPolicy Bypass -File `"$rearmScriptPath`""
+    $rearmAction = New-ScheduledTaskAction -Execute $rearmCmdPath -Argument $rearmTaskArgs
+    $rearmTrigger = New-ScheduledTaskTrigger -AtStartup
+    $rearmPrincipal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
+    $rearmSettings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Minutes 30) -MultipleInstances IgnoreNew
+    try { Register-ScheduledTask -TaskName $rearmTaskName -Action $rearmAction -Trigger $rearmTrigger -Principal $rearmPrincipal -Settings $rearmSettings -Force | Out-Null } catch { Write-Fail "Scheduled task registration failed for ${rearmTaskName}: $($_.Exception.Message)" }
+    $registeredRearmTask = schtasks.exe /Query /TN $rearmTaskName /FO LIST 2>$null
+    if (-not $registeredRearmTask) { Write-Fail "Post-boot re-arm scheduled task registration failed: $rearmTaskName" }
+    $writtenRearm = Get-Content -LiteralPath $rearmScriptPath -Raw -ErrorAction SilentlyContinue
+    if (-not $writtenRearm) { Write-Fail "Post-boot re-arm script missing: $rearmScriptPath" }
+    Write-Ok "Post-boot re-arm registered: $rearmTaskName (PT30M limit; fallback runner Run-Terminal-WindowsOld-Cleanup.cmd)."

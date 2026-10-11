@@ -1,8 +1,0 @@
-*install  Active Directory Domain Services feature, including management tools, on Windows Server:
-
-Install-WindowsFeature -Name AD-Domain-Services -IncludeManagementTools
-
-
-*create domain controller and install dns:
-
-Install-ADDSForest -DomainName "domainname.domainname.com" -InstallDns -NoRebootOnCompletion

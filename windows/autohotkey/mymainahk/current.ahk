@@ -24,22 +24,31 @@ A_TrayMenu.Add("Exit", (*) => ExitApp())
 A_TrayMenu.Default := "Reload"
 A_IconTip := "MyMainAHK"
 
-; Own Ctrl+H and Alt+H through one explicit Windows registration path.  The
+; Own Ctrl+H, Alt+H, and Ctrl+R through one explicit Windows registration path. The
 ; MOD_NOREPEAT flag is essential: without it, holding the chord long enough for
 ; the game to minimize can send another activation to the newly exposed app.
 global PROCESS_PAUSE_HOTKEY_ID := 0x4A01
 global PROCESS_RESUME_HOTKEY_ID := 0x4A02
+global GAME_LIBRARY_HOTKEY_ID := 0x4A03
 global processControlHotkeysRegistered := false
 global lastPauseHotkeyMessageTime := 0
 global lastResumeHotkeyMessageTime := 0
 global processHotkeyRegistrationFailures := 0
 OnMessage(0x0312, ProcessControlHotkeyMessage) ; WM_HOTKEY
 OnExit(UnregisterProcessControlHotkeys)
+OnExit(CloseGameControlPipe)
 RegisterProcessControlHotkeys()
 SetTimer(CheckMcsPostRestoreMarker, -1)
 SetTimer(CheckMcsPostRestoreMarker, 500)
 SetTimer(EnsureWhisperKeyRunning, -2000)
 SetTimer(EnsureWhisperKeyRunning, 10000)
+; Keep the OpenWhispr Ctrl+Win dictation trigger exact (functions at file end).
+global sttGuardArmed := false
+global sttGuardForeign := false
+global sttGuardSuspended := false
+global sttGuardResumeAt := 0
+SetTimer(SttGuardTick, 25)
+OnExit(SttGuardOnExit)
 SetTimer(InitializeGameLaunchMonitorEnforcer, -1)
 
 global knownGameLaunchWindows := Map()
@@ -77,7 +86,9 @@ GetMonitorAtPoint(x, y) {
 }
 
 PlaceGameWindowOnMonitor(hwnd, monitorNum) {
-    if (!DllCall("IsWindow", "Ptr", hwnd, "Int")) {
+    ; A hung game window (e.g. suspended by Ctrl+H) cannot be repositioned and
+    ; would block the synchronous Win* calls; skip it instead.
+    if (!DllCall("IsWindow", "Ptr", hwnd, "Int") || IsWindowHung(hwnd)) {
         return false
     }
 
@@ -90,19 +101,21 @@ PlaceGameWindowOnMonitor(hwnd, monitorNum) {
 
         if (isFullscreen) {
             DllCall("SetWindowPos", "Ptr", hwnd, "Ptr", 0, "Int", left, "Int", top
-                , "Int", width, "Int", height, "UInt", 0x0014) ; NOZORDER | NOACTIVATE
+                , "Int", width, "Int", height, "UInt", 0x0014 | 0x4000) ; NOZORDER | NOACTIVATE | ASYNCWINDOWPOS
         } else {
             if (isMaximized) {
-                WinRestore("ahk_id " hwnd)
+                AsyncWinRestore(hwnd)
+                Sleep(40)
             }
             WinGetPos(, , &windowWidth, &windowHeight, "ahk_id " hwnd)
             windowWidth := Min(windowWidth, width)
             windowHeight := Min(windowHeight, height)
             targetX := left + Max(0, (width - windowWidth) // 2)
             targetY := top + Max(0, (height - windowHeight) // 2)
-            WinMove(targetX, targetY, windowWidth, windowHeight, "ahk_id " hwnd)
+            AsyncWinMove(hwnd, targetX, targetY, windowWidth, windowHeight)
             if (isMaximized) {
-                WinMaximize("ahk_id " hwnd)
+                Sleep(40)
+                AsyncWinMaximize(hwnd)
             }
         }
         return GetWindowMonitor(hwnd) = monitorNum
@@ -150,13 +163,17 @@ EnsureWhisperKeyRunning()
 {
     heartbeat := "F:\backup\windowsapps\installed\WhisperKeyLocal\Data\runtime-heartbeat.txt"
     launcher := A_AppData "\Microsoft\Windows\Start Menu\Programs\Startup\WhisperKeyLocal.vbs"
+    ; The optional WhisperKey helper was removed from Startup.  Never let a
+    ; missing helper interrupt the shortcut controller's timer thread.
+    if !FileExist(launcher)
+        return
     if !FileExist(heartbeat) || DateDiff(A_Now, FileGetTime(heartbeat, "M"), "Seconds") > 15 {
-        Run('wscript.exe //B //Nologo "' launcher '"', , "Hide")
+        try Run('wscript.exe //B //Nologo "' launcher '"', , "Hide")
     }
 }
 
 RegisterProcessControlHotkeys() {
-    global PROCESS_PAUSE_HOTKEY_ID, PROCESS_RESUME_HOTKEY_ID
+    global PROCESS_PAUSE_HOTKEY_ID, PROCESS_RESUME_HOTKEY_ID, GAME_LIBRARY_HOTKEY_ID
         , processControlHotkeysRegistered, processHotkeyRegistrationFailures
     if (processControlHotkeysRegistered) {
         return true
@@ -168,10 +185,13 @@ RegisterProcessControlHotkeys() {
     altOk := DllCall("RegisterHotKey", "Ptr", A_ScriptHwnd
         , "Int", PROCESS_RESUME_HOTKEY_ID, "UInt", 0x4001, "UInt", 0x48, "Int") ; ALT | NOREPEAT, H
     altError := A_LastError
-    if (ctrlOk && altOk) {
+    libraryOk := DllCall("RegisterHotKey", "Ptr", A_ScriptHwnd
+        , "Int", GAME_LIBRARY_HOTKEY_ID, "UInt", 0x4002, "UInt", 0x52, "Int") ; CTRL | NOREPEAT, R
+    libraryError := A_LastError
+    if (ctrlOk && altOk && libraryOk) {
         processControlHotkeysRegistered := true
         processHotkeyRegistrationFailures := 0
-        LogFreezeAction("Registered Ctrl+H and Alt+H with MOD_NOREPEAT")
+        LogFreezeAction("Registered Ctrl+H, Alt+H, and Ctrl+R with MOD_NOREPEAT")
         return true
     }
 
@@ -183,12 +203,15 @@ RegisterProcessControlHotkeys() {
     if (altOk) {
         DllCall("UnregisterHotKey", "Ptr", A_ScriptHwnd, "Int", PROCESS_RESUME_HOTKEY_ID)
     }
+    if (libraryOk) {
+        DllCall("UnregisterHotKey", "Ptr", A_ScriptHwnd, "Int", GAME_LIBRARY_HOTKEY_ID)
+    }
     ; Failure almost always means a previous instance of this script still owns
     ; the hotkeys and is not exiting. Log once, then after a few seconds force-
     ; remove the duplicate so Ctrl+H/Alt+H and every other hotkey work again.
     processHotkeyRegistrationFailures += 1
     if (processHotkeyRegistrationFailures = 1) {
-        LogFreezeAction("Hotkey registration retry CtrlError=" ctrlError " AltError=" altError)
+        LogFreezeAction("Hotkey registration retry CtrlError=" ctrlError " AltError=" altError " LibraryError=" libraryError)
     }
     if (processHotkeyRegistrationFailures >= 12) {
         LogFreezeAction("Force-removing duplicate instances holding Ctrl+H/Alt+H")
@@ -221,17 +244,17 @@ RemoveDuplicateInstances() {
 }
 
 UnregisterProcessControlHotkeys(*) {
-    global PROCESS_PAUSE_HOTKEY_ID, PROCESS_RESUME_HOTKEY_ID
+    global PROCESS_PAUSE_HOTKEY_ID, PROCESS_RESUME_HOTKEY_ID, GAME_LIBRARY_HOTKEY_ID
         , processControlHotkeysRegistered
     DllCall("UnregisterHotKey", "Ptr", A_ScriptHwnd, "Int", PROCESS_PAUSE_HOTKEY_ID)
     DllCall("UnregisterHotKey", "Ptr", A_ScriptHwnd, "Int", PROCESS_RESUME_HOTKEY_ID)
+    DllCall("UnregisterHotKey", "Ptr", A_ScriptHwnd, "Int", GAME_LIBRARY_HOTKEY_ID)
     processControlHotkeysRegistered := false
 }
 
 ProcessControlHotkeyMessage(wParam, lParam, msg, hwnd) {
-    global PROCESS_PAUSE_HOTKEY_ID, PROCESS_RESUME_HOTKEY_ID
+    global PROCESS_PAUSE_HOTKEY_ID, PROCESS_RESUME_HOTKEY_ID, GAME_LIBRARY_HOTKEY_ID
         , lastPauseHotkeyMessageTime, lastResumeHotkeyMessageTime
-    Critical("On")
     messageTime := DllCall("GetMessageTime", "UInt")
     if (wParam = PROCESS_PAUSE_HOTKEY_ID) {
         elapsed := (messageTime - lastPauseHotkeyMessageTime) & 0xFFFFFFFF
@@ -247,8 +270,330 @@ ProcessControlHotkeyMessage(wParam, lParam, msg, hwnd) {
         }
         lastResumeHotkeyMessageTime := messageTime
         RestoreFrozenApps()
+    } else if (wParam = GAME_LIBRARY_HOTKEY_ID) {
+        OpenGameLibraryManager()
     }
     return 0
+}
+
+StartGameControlPipe() {
+    global gameControlPipeHandle, gameControlPipeName
+    if (gameControlPipeHandle)
+        return true
+
+    sid := GetCurrentUserSidString()
+    if (sid = "")
+        return false
+    sessionId := 0
+    if !DllCall("ProcessIdToSessionId", "UInt", DllCall("GetCurrentProcessId", "UInt"), "UInt*", &sessionId, "Int")
+        return false
+
+    gameControlPipeName := "\\.\pipe\GameLibrary-AHK-Control-" sid "-" sessionId
+    descriptorText := "D:P(A;;GA;;;" sid ")"
+    securityDescriptor := 0
+    if !DllCall("Advapi32\ConvertStringSecurityDescriptorToSecurityDescriptorW"
+        , "WStr", descriptorText, "UInt", 1, "Ptr*", &securityDescriptor, "Ptr", 0, "Int")
+        return false
+
+    securityAttributes := Buffer(A_PtrSize = 8 ? 24 : 12, 0)
+    NumPut("UInt", securityAttributes.Size, securityAttributes, 0)
+    NumPut("Ptr", securityDescriptor, securityAttributes, A_PtrSize = 8 ? 8 : 4)
+    NumPut("Int", 0, securityAttributes, A_PtrSize * 2)
+    pipe := DllCall("CreateNamedPipeW", "WStr", gameControlPipeName
+        , "UInt", 0x00000003 ; PIPE_ACCESS_DUPLEX
+        , "UInt", 0x0000000F ; message mode, nonblocking, reject remote clients
+        , "UInt", 1, "UInt", 4096, "UInt", 4096, "UInt", 0
+        , "Ptr", securityAttributes.Ptr, "Ptr")
+    DllCall("LocalFree", "Ptr", securityDescriptor, "Ptr")
+    if (!pipe || pipe = -1)
+        return false
+    gameControlPipeHandle := pipe
+    return true
+}
+
+CloseGameControlPipe(*) {
+    global gameControlPipeHandle, gameControlPipeConnected, gameControlPipeReplySent, gameControlPipeConnectedTick
+    SetTimer(PollGameControlPipe, 0)
+    if (!gameControlPipeHandle)
+        return
+    if (gameControlPipeConnected)
+        DllCall("DisconnectNamedPipe", "Ptr", gameControlPipeHandle)
+    DllCall("CloseHandle", "Ptr", gameControlPipeHandle)
+    gameControlPipeHandle := 0
+    gameControlPipeConnected := false
+    gameControlPipeReplySent := false
+    gameControlPipeConnectedTick := 0
+}
+
+PollGameControlPipe() {
+    global gameControlPipeHandle, gameControlPipeConnected, gameControlPipeReplySent, gameControlPipeReplyTick, gameControlPipeLastStartTick, gameControlPipeConnectedTick
+    if (!gameControlPipeHandle) {
+        if (!gameControlPipeLastStartTick || A_TickCount - gameControlPipeLastStartTick >= 5000) {
+            gameControlPipeLastStartTick := A_TickCount
+            StartGameControlPipe()
+        }
+        return
+    }
+
+    if (!gameControlPipeConnected) {
+        connected := DllCall("ConnectNamedPipe", "Ptr", gameControlPipeHandle, "Ptr", 0, "Int")
+        connectError := connected ? 0 : DllCall("GetLastError", "UInt")
+        if (!connected && connectError != 535) { ; ERROR_PIPE_CONNECTED
+            return
+        }
+        gameControlPipeConnected := true
+        gameControlPipeConnectedTick := A_TickCount
+        gameControlPipeReplySent := false
+    }
+
+    requestBuffer := Buffer(2048, 0)
+    bytesRead := 0
+    readOk := DllCall("ReadFile", "Ptr", gameControlPipeHandle, "Ptr", requestBuffer.Ptr
+        , "UInt", requestBuffer.Size - 1, "UInt*", &bytesRead, "Ptr", 0, "Int")
+    if (!readOk) {
+        readError := DllCall("GetLastError", "UInt")
+        if (readError = 232) ; ERROR_NO_DATA: client connected, request not written yet
+        {
+            if ((gameControlPipeReplySent && A_TickCount - gameControlPipeReplyTick > 5000)
+                || (!gameControlPipeReplySent && A_TickCount - gameControlPipeConnectedTick > 2000))
+                DisconnectGameControlPipeClient()
+            return
+        }
+        if (readError = 234) { ; ERROR_MORE_DATA: reject oversized request
+            if (WriteGameControlPipeResponse("", "failed", "Request exceeded the protocol limit.")) {
+                gameControlPipeReplySent := true
+                gameControlPipeReplyTick := A_TickCount
+            } else {
+                DisconnectGameControlPipeClient()
+            }
+            return
+        }
+        DisconnectGameControlPipeClient()
+        return
+    }
+    if (bytesRead = 0) {
+        if (gameControlPipeReplySent)
+            DisconnectGameControlPipeClient()
+        return
+    }
+
+    request := StrGet(requestBuffer, bytesRead, "UTF-8")
+    try response := HandleGameControlPipeRequest(request)
+    catch as ex {
+        response := {RequestId: "", State: "failed", Detail: "AHK handler failed."}
+    }
+    if (WriteGameControlPipeResponse(response.RequestId, response.State, response.Detail)) {
+        gameControlPipeReplySent := true
+        gameControlPipeReplyTick := A_TickCount
+    } else {
+        DisconnectGameControlPipeClient()
+    }
+}
+
+DisconnectGameControlPipeClient() {
+    global gameControlPipeHandle, gameControlPipeConnected, gameControlPipeReplySent, gameControlPipeConnectedTick
+    if (gameControlPipeHandle && gameControlPipeConnected)
+        DllCall("DisconnectNamedPipe", "Ptr", gameControlPipeHandle)
+    gameControlPipeConnected := false
+    gameControlPipeReplySent := false
+    gameControlPipeConnectedTick := 0
+}
+
+HandleGameControlPipeRequest(request) {
+    global gameControlRequests, gameControlRequestOrder, gameControlPipeHandle
+    fields := StrSplit(Trim(request, "`r`n"), "`t")
+    requestId := fields.Length >= 2 ? fields[2] : ""
+    operation := fields.Length >= 3 ? fields[3] : ""
+    if (fields.Length != 6 || fields[1] != "v1" || !RegExMatch(requestId, "^[0-9A-Fa-f]{32}$"))
+        return {RequestId: requestId, State: "failed", Detail: "Malformed request."}
+
+    if (!RegExMatch(fields[4], "^[0-9]{1,10}$") || !RegExMatch(fields[5], "^[0-9A-Fa-f]{16}$")
+        || !RegExMatch(fields[6], "^[0-9]{1,20}$"))
+        return {RequestId: requestId, State: "failed", Detail: "Malformed process identity."}
+
+    pid := Integer(fields[4])
+    created := StrUpper(fields[5])
+    hwnd := Integer(fields[6])
+    clientPid := 0
+    if (!DllCall("GetNamedPipeClientProcessId", "Ptr", gameControlPipeHandle, "UInt*", &clientPid, "Int")
+        || !IsAuthorizedGameLibraryClient(clientPid))
+        return {RequestId: requestId, State: "failed", Detail: "The requesting process is not the Game Library in this session."}
+
+    if (gameControlRequests.Has(requestId)) {
+        previous := gameControlRequests[requestId]
+        if (previous.Operation != operation || previous.Pid != pid || previous.Created != created || previous.Hwnd != hwnd)
+            return {RequestId: requestId, State: "failed", Detail: "A request ID was reused with a different operation or target."}
+        return {RequestId: requestId, State: previous.State, Detail: previous.Detail}
+    }
+
+    if (operation != "Pause" && operation != "Resume" && operation != "Status")
+        return RememberGameControlRequest(requestId, operation, pid, created, hwnd, "failed", "Unsupported operation.")
+    if (!ValidateGameControlTarget(pid, created, hwnd, clientPid))
+        return RememberGameControlRequest(requestId, operation, pid, created, hwnd, "failed", "The process, creation stamp, window, or session did not match.")
+
+    if (operation = "Status") {
+        state := GetGameControlState(pid, created, hwnd)
+        detail := state = "failed" ? "The target has a pending recovery error." : "Current state read from the AHK frozen-process registry."
+        return RememberGameControlRequest(requestId, operation, pid, created, hwnd, state, detail)
+    }
+
+    currentState := GetGameControlState(pid, created, hwnd)
+    if ((operation = "Pause" && currentState = "paused") || (operation = "Resume" && currentState = "running"))
+        return RememberGameControlRequest(requestId, operation, pid, created, hwnd, currentState, "The target is already in the requested state.")
+
+    pendingState := operation = "Pause" ? "pausing" : "resuming"
+    RememberGameControlRequest(requestId, operation, pid, created, hwnd, pendingState, "The target operation was queued.")
+    SetTimer(() => RunGameControlPipeOperation(requestId, operation, pid, created, hwnd), -1)
+    return gameControlRequests[requestId]
+}
+
+RunGameControlPipeOperation(requestId, operation, pid, created, hwnd) {
+    global gameControlRequests
+    if (!gameControlRequests.Has(requestId))
+        return
+    try {
+        state := operation = "Pause" ? PauseTargetWindow(hwnd, pid, created) : ResumeTargetProcess(pid, created, hwnd)
+        detail := state = "failed" ? "AHK could not safely complete the operation." : "The target operation completed or is restoring its window."
+    } catch as ex {
+        state := "failed"
+        detail := ex.Message
+    }
+    if (gameControlRequests.Has(requestId))
+        SetGameControlRequestState(requestId, state, detail)
+}
+
+RememberGameControlRequest(requestId, operation, pid, created, hwnd, state, detail) {
+    global gameControlRequests, gameControlRequestOrder
+    gameControlRequests[requestId] := {RequestId: requestId, Operation: operation, Pid: pid, Created: created, Hwnd: hwnd, State: state, Detail: SanitizeGameControlText(detail)}
+    gameControlRequestOrder.Push(requestId)
+    while (gameControlRequestOrder.Length > 256) {
+        oldId := gameControlRequestOrder.RemoveAt(1)
+        if (gameControlRequests.Has(oldId))
+            gameControlRequests.Delete(oldId)
+    }
+    return gameControlRequests[requestId]
+}
+
+SetGameControlRequestState(requestId, state, detail) {
+    global gameControlRequests
+    if (!gameControlRequests.Has(requestId))
+        return
+    entry := gameControlRequests[requestId]
+    entry.State := state
+    entry.Detail := SanitizeGameControlText(detail)
+}
+
+WriteGameControlPipeResponse(requestId, state, detail) {
+    global gameControlPipeHandle
+    if (!gameControlPipeHandle)
+        return false
+    response := "v1`t" requestId "`t" state "`t" SanitizeGameControlText(detail) "`n"
+    responseBuffer := Buffer(StrPut(response, "UTF-8"), 0)
+    responseBytes := StrPut(response, responseBuffer, "UTF-8") - 1
+    bytesWritten := 0
+    return DllCall("WriteFile", "Ptr", gameControlPipeHandle, "Ptr", responseBuffer.Ptr
+        , "UInt", responseBytes, "UInt*", &bytesWritten, "Ptr", 0, "Int") && bytesWritten = responseBytes
+}
+
+SanitizeGameControlText(value) {
+    value := StrReplace(value, "`t", " ")
+    value := StrReplace(value, "`r", " ")
+    value := StrReplace(value, "`n", " ")
+    return SubStr(value, 1, 300)
+}
+
+GetGameControlState(pid, created, hwnd) {
+    global frozenProcesses
+    if (!ProcessExist(pid) || GetProcessCreationStamp(pid) != created)
+        return "failed"
+    for _, processInfo in frozenProcesses {
+        if (processInfo.pid != pid || !processInfo.HasProp("created") || processInfo.created != created)
+            continue
+        if (processInfo.state = "paused")
+            return "paused"
+        if (processInfo.state = "pausing")
+            return "pausing"
+        if (processInfo.state = "resuming")
+            return "resuming"
+        if (processInfo.state = "restoring")
+            return "restoring"
+        if (processInfo.state = "restore_pending")
+            return "failed"
+    }
+    return "running"
+}
+
+ValidateGameControlTarget(pid, created, hwnd, clientPid := 0) {
+    if (!pid || !hwnd || pid = DllCall("GetCurrentProcessId", "UInt") || pid = clientPid
+        || !RegExMatch(created, "^[0-9A-F]{16}$") || !ProcessExist(pid)
+        || !DllCall("IsWindow", "Ptr", hwnd, "Int"))
+        return false
+    if (GetProcessSessionId(pid) != GetCurrentSessionId() || GetProcessCreationStamp(pid) != created)
+        return false
+    windowPid := 0
+    if (!DllCall("GetWindowThreadProcessId", "Ptr", hwnd, "UInt*", &windowPid) || windowPid != pid)
+        return false
+    imagePath := GetProcessImagePath(pid)
+    imageName := StrLower(RegExReplace(imagePath, ".*\\", ""))
+    return imagePath != "" && imageName != "gamelibrary.exe"
+        && imageName != "autohotkey64.exe" && imageName != "autohotkey.exe"
+}
+
+IsAuthorizedGameLibraryClient(pid) {
+    if (!pid || GetProcessSessionId(pid) != GetCurrentSessionId())
+        return false
+    imagePath := GetProcessImagePath(pid)
+    imageName := StrLower(RegExReplace(imagePath, ".*\\", ""))
+    return imageName = "gamelibrary.exe"
+}
+
+GetCurrentSessionId() {
+    sessionId := 0
+    if DllCall("ProcessIdToSessionId", "UInt", DllCall("GetCurrentProcessId", "UInt"), "UInt*", &sessionId, "Int")
+        return sessionId
+    return -1
+}
+
+GetProcessSessionId(pid) {
+    sessionId := 0
+    return DllCall("ProcessIdToSessionId", "UInt", pid, "UInt*", &sessionId, "Int") ? sessionId : -1
+}
+
+GetProcessImagePath(pid) {
+    process := DllCall("OpenProcess", "UInt", 0x1000, "Int", 0, "UInt", pid, "Ptr")
+    if (!process)
+        return ""
+    imageBuffer := Buffer(32768 * 2, 0)
+    length := 32768
+    ok := DllCall("QueryFullProcessImageNameW", "Ptr", process, "UInt", 0
+        , "Ptr", imageBuffer.Ptr, "UInt*", &length, "Int")
+    DllCall("CloseHandle", "Ptr", process)
+    return ok ? StrGet(imageBuffer, length, "UTF-16") : ""
+}
+
+GetCurrentUserSidString() {
+    token := 0
+    if !DllCall("Advapi32\OpenProcessToken", "Ptr", DllCall("GetCurrentProcess", "Ptr"), "UInt", 0x0008, "Ptr*", &token, "Int")
+        return ""
+    required := 0
+    DllCall("Advapi32\GetTokenInformation", "Ptr", token, "Int", 1, "Ptr", 0, "UInt", 0, "UInt*", &required)
+    if (!required) {
+        DllCall("CloseHandle", "Ptr", token)
+        return ""
+    }
+    tokenUser := Buffer(required, 0)
+    if !DllCall("Advapi32\GetTokenInformation", "Ptr", token, "Int", 1, "Ptr", tokenUser.Ptr, "UInt", required, "UInt*", &required, "Int") {
+        DllCall("CloseHandle", "Ptr", token)
+        return ""
+    }
+    sidStringPointer := 0
+    sidPointer := NumGet(tokenUser, 0, "Ptr")
+    ok := DllCall("Advapi32\ConvertSidToStringSidW", "Ptr", sidPointer, "Ptr*", &sidStringPointer, "Int")
+    sid := ok ? StrGet(sidStringPointer, "UTF-16") : ""
+    if (sidStringPointer)
+        DllCall("LocalFree", "Ptr", sidStringPointer, "Ptr")
+    DllCall("CloseHandle", "Ptr", token)
+    return sid
 }
 
 ; ============================================================================
@@ -533,6 +878,11 @@ EnumerateWindowsByMonitor() {
                 if (wW < 50 || wH < 50)
                     continue
             }
+
+            ; A hung window (e.g. a game suspended by Ctrl+H) cannot be moved;
+            ; skip it so bulk swaps never block on synchronous Win* calls.
+            if IsWindowHung(hwnd)
+                continue
 
             monitorNum := GetWindowMonitor(hwnd)
             if windowsByMonitor.Has(monitorNum)
@@ -913,7 +1263,9 @@ MoveAllWindowsToMonitor(targetMonitor) {
 }
 
 MoveWindowScaledBetweenMonitors(hwnd, sourceMonitor, targetMonitor) {
-    if (!hwnd || !WinExist("ahk_id " hwnd))
+    ; Hung windows (frozen games, suspended processes) cannot be moved and
+    ; block synchronous Win* commands; skip them instead of stalling the script.
+    if (!hwnd || !WinExist("ahk_id " hwnd) || IsWindowHung(hwnd))
         return false
 
     try {
@@ -924,7 +1276,7 @@ MoveWindowScaledBetweenMonitors(hwnd, sourceMonitor, targetMonitor) {
         minMaxState := WinGetMinMax("ahk_id " hwnd)
         wasMinimized := minMaxState = -1
         if wasMinimized {
-            WinRestore("ahk_id " hwnd)
+            AsyncWinRestore(hwnd)
             Sleep(50)
             minMaxState := WinGetMinMax("ahk_id " hwnd)
         }
@@ -932,12 +1284,12 @@ MoveWindowScaledBetweenMonitors(hwnd, sourceMonitor, targetMonitor) {
         wasFullscreen := IsWindowFullscreen(hwnd) && !wasMaximized
 
         if wasFullscreen {
-            WinRestore("ahk_id " hwnd)
+            AsyncWinRestore(hwnd)
             Sleep(80)
-            WinMove(tFullLeft, tFullTop, tFullRight - tFullLeft, tFullBottom - tFullTop, "ahk_id " hwnd)
+            AsyncWinMove(hwnd, tFullLeft, tFullTop, tFullRight - tFullLeft, tFullBottom - tFullTop)
         } else {
             if wasMaximized {
-                WinRestore("ahk_id " hwnd)
+                AsyncWinRestore(hwnd)
                 Sleep(40)
             }
 
@@ -952,17 +1304,17 @@ MoveWindowScaledBetweenMonitors(hwnd, sourceMonitor, targetMonitor) {
             newY := tTop + Round((winY - sTop) * (targetHeight / sourceHeight))
             newX := Max(tLeft, Min(newX, tRight - newWidth))
             newY := Max(tTop, Min(newY, tBottom - newHeight))
-            WinMove(newX, newY, newWidth, newHeight, "ahk_id " hwnd)
+            AsyncWinMove(hwnd, newX, newY, newWidth, newHeight)
 
             if wasMaximized {
                 Sleep(40)
-                WinMaximize("ahk_id " hwnd)
+                AsyncWinMaximize(hwnd)
             }
         }
 
         if wasMinimized {
             Sleep(40)
-            WinMinimize("ahk_id " hwnd)
+            AsyncWinMinimize(hwnd)
         }
         return GetWindowMonitor(hwnd) = targetMonitor
     } catch {
@@ -1198,17 +1550,98 @@ WaitForMinimizedState(hwnd, shouldBeMinimized, timeoutMs := 350) {
     }
 }
 
+; ============================================================================
+; ASYNC WINDOW OPERATIONS
+; ============================================================================
+; A window owned by a frozen or hung process (e.g. a game suspended by Ctrl+H)
+; cannot process synchronous messages.  AHK's WinMove/WinMaximize/WinRestore
+; send those synchronously and BLOCK the entire script - every hotkey, timer
+; and the reload/exit message stops until the target responds, which for a
+; suspended game is forever.  These helpers deliver the same window-state
+; changes asynchronously (PostMessage / ShowWindowAsync / SWP_ASYNCWINDOWPOS),
+; so a hung window can never stall the shortcut runtime again.
+
+IsWindowHung(hwnd) {
+    return hwnd && DllCall("IsWindow", "Ptr", hwnd, "Int") && DllCall("IsHungAppWindow", "Ptr", hwnd, "Int")
+}
+
+AsyncWinRestore(hwnd) {
+    if (!hwnd || !DllCall("IsWindow", "Ptr", hwnd, "Int"))
+        return
+    DllCall("ShowWindowAsync", "Ptr", hwnd, "Int", 9) ; SW_RESTORE
+    PostMessage(0x0112, 0xF120, 0, , "ahk_id " hwnd)   ; WM_SYSCOMMAND, SC_RESTORE
+}
+
+AsyncWinMinimize(hwnd) {
+    if (!hwnd || !DllCall("IsWindow", "Ptr", hwnd, "Int"))
+        return
+    DllCall("ShowWindowAsync", "Ptr", hwnd, "Int", 6) ; SW_MINIMIZE
+    PostMessage(0x0112, 0xF020, 0, , "ahk_id " hwnd)   ; WM_SYSCOMMAND, SC_MINIMIZE
+}
+
+AsyncWinMaximize(hwnd) {
+    if (!hwnd || !DllCall("IsWindow", "Ptr", hwnd, "Int"))
+        return
+    DllCall("ShowWindowAsync", "Ptr", hwnd, "Int", 3) ; SW_MAXIMIZE
+    PostMessage(0x0112, 0xF030, 0, , "ahk_id " hwnd)   ; WM_SYSCOMMAND, SC_MAXIMIZE
+}
+
+AsyncWinMove(hwnd, x, y, w, h) {
+    if (!hwnd || !DllCall("IsWindow", "Ptr", hwnd, "Int"))
+        return
+    ; SWP_NOZORDER | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS: never blocks on the
+    ; target thread, so a frozen window cannot stall this script.
+    DllCall("SetWindowPos", "Ptr", hwnd, "Ptr", 0
+        , "Int", x, "Int", y, "Int", w, "Int", h
+        , "UInt", 0x0014 | 0x4000)
+}
+
+; SetForegroundWindow never blocks on the target thread.
+AsyncActivate(hwnd) {
+    if (!hwnd || !DllCall("IsWindow", "Ptr", hwnd, "Int"))
+        return
+    DllCall("SetForegroundWindow", "Ptr", hwnd)
+}
+
 ; Force minimize a window using multiple methods
 ; Parameters:
 ;   hwnd - Window handle to minimize
 ForceMinimize(hwnd) {
-    ; Start asynchronously, then use SW_FORCEMINIMIZE.  The synchronous force
-    ; call is specifically designed to minimize a window owned by another
-    ; thread and is required by some fullscreen games (including Yakuza 3).
+    ; Start asynchronously, then force-minimize.  ShowWindowAsync and
+    ; PostMessage never block, so a frozen/hung window (e.g. a game suspended
+    ; by Ctrl+H) cannot stall the script while it minimizes.
     DllCall("ShowWindowAsync", "Ptr", hwnd, "Int", 6) ; SW_MINIMIZE
     DllCall("PostMessage", "Ptr", hwnd, "UInt", 0x0112, "Ptr", 0xF020, "Ptr", 0)
-    DllCall("ShowWindow", "Ptr", hwnd, "Int", 11) ; SW_FORCEMINIMIZE
+    DllCall("ShowWindowAsync", "Ptr", hwnd, "Int", 11) ; SW_FORCEMINIMIZE
+    if IsWindowHung(hwnd)
+        return true  ; A hung window cannot confirm state; treat as minimized.
     return WaitForMinimizedState(hwnd, true)
+}
+
+ParkGameWindow(hwnd) {
+    ; Some launchers and games immediately undo SW_MINIMIZE. Minimize first so
+    ; the application receives the normal transition, then hide the same HWND
+    ; while it is throttled. Alt+H's restore path explicitly shows it again.
+    if !ForceMinimize(hwnd)
+        return false
+    DllCall("ShowWindowAsync", "Ptr", hwnd, "Int", 0) ; SW_HIDE
+    return true
+}
+
+ParkGameWindows(pid, preferredHwnd := 0) {
+    parked := true
+    if (preferredHwnd && DllCall("IsWindow", "Ptr", preferredHwnd, "Int")
+        && DllCall("IsWindowVisible", "Ptr", preferredHwnd, "Int")) {
+        parked := ParkGameWindow(preferredHwnd) && parked
+    }
+    for hwnd in WinGetList("ahk_pid " pid) {
+        if (hwnd = preferredHwnd
+            || !DllCall("IsWindowVisible", "Ptr", hwnd, "Int")) {
+            continue
+        }
+        parked := ParkGameWindow(hwnd) && parked
+    }
+    return parked
 }
 
 ; Exclusive-fullscreen games can permanently lose their Direct3D device when
@@ -1290,9 +1723,10 @@ EnsureFullscreenAfterRestore(hwnd, placement) {
 
     while (A_TickCount < deadline) {
         minimized := DllCall("IsIconic", "Ptr", hwnd, "Int")
+        visible := DllCall("IsWindowVisible", "Ptr", hwnd, "Int")
         foreground := DllCall("GetForegroundWindow", "Ptr") = hwnd
         fullscreenBounds := IsWindowFullscreenLike(hwnd)
-        ready := !minimized && foreground && fullscreenBounds
+        ready := !minimized && visible && foreground && fullscreenBounds
 
         if (ready) {
             if (!stableSince) {
@@ -1310,16 +1744,18 @@ EnsureFullscreenAfterRestore(hwnd, placement) {
             ; fullscreen swap chain, which can otherwise turn black.
             DllCall("ShowWindowAsync", "Ptr", hwnd, "Int", 9) ; SW_RESTORE
             DllCall("OpenIcon", "Ptr", hwnd)
-            DllCall("ShowWindow", "Ptr", hwnd, "Int", 5) ; SW_SHOW
+            DllCall("ShowWindowAsync", "Ptr", hwnd, "Int", 5) ; SW_SHOW
             DllCall("SetWindowPos", "Ptr", hwnd, "Ptr", 0
                 , "Int", 0, "Int", 0, "Int", 0, "Int", 0
-                , "UInt", 0x0043) ; SHOW | NOMOVE | NOSIZE
+                , "UInt", 0x0043 | 0x4000) ; SHOW | NOMOVE | NOSIZE | ASYNCWINDOWPOS
             if (!fullscreenBounds) {
                 DllCall("ShowWindowAsync", "Ptr", hwnd, "Int", 3) ; SW_MAXIMIZE
-                DllCall("ShowWindow", "Ptr", hwnd, "Int", 3)
+                DllCall("ShowWindowAsync", "Ptr", hwnd, "Int", 3)
             }
             DllCall("BringWindowToTop", "Ptr", hwnd)
-            try WinActivate("ahk_id " hwnd)
+            ; SetForegroundWindow is nonblocking from this controller's point
+            ; of view. Never call WinActivate here: after working-set trim it
+            ; can synchronously wait for a paging game and stall Alt+H.
             DllCall("SetForegroundWindow", "Ptr", hwnd)
             nextRecoveryPulse := A_TickCount + 500
         }
@@ -1328,6 +1764,7 @@ EnsureFullscreenAfterRestore(hwnd, placement) {
 
     return stableSince && A_TickCount - stableSince >= 5000
         && !DllCall("IsIconic", "Ptr", hwnd, "Int")
+        && DllCall("IsWindowVisible", "Ptr", hwnd, "Int")
         && DllCall("GetForegroundWindow", "Ptr") = hwnd && IsWindowFullscreenLike(hwnd)
 }
 
@@ -1358,16 +1795,15 @@ RestoreFullscreenPulse(hwnd, fullscreenBounds := false) {
     }
     DllCall("ShowWindowAsync", "Ptr", hwnd, "Int", 9) ; SW_RESTORE
     DllCall("OpenIcon", "Ptr", hwnd)
-    DllCall("ShowWindow", "Ptr", hwnd, "Int", 5) ; SW_SHOW
+    DllCall("ShowWindowAsync", "Ptr", hwnd, "Int", 5) ; SW_SHOW
     DllCall("SetWindowPos", "Ptr", hwnd, "Ptr", 0
         , "Int", 0, "Int", 0, "Int", 0, "Int", 0
-        , "UInt", 0x0043) ; SHOW | NOMOVE | NOSIZE
+        , "UInt", 0x0043 | 0x4000) ; SHOW | NOMOVE | NOSIZE | ASYNCWINDOWPOS
     if (!fullscreenBounds) {
         DllCall("ShowWindowAsync", "Ptr", hwnd, "Int", 3) ; SW_MAXIMIZE
-        DllCall("ShowWindow", "Ptr", hwnd, "Int", 3)
+        DllCall("ShowWindowAsync", "Ptr", hwnd, "Int", 3)
     }
     DllCall("BringWindowToTop", "Ptr", hwnd)
-    try WinActivate("ahk_id " hwnd)
     DllCall("SetForegroundWindow", "Ptr", hwnd)
     return true
 }
@@ -1390,7 +1826,8 @@ FinalizeFullscreenRecovery(hwnd, succeeded) {
 
 FullscreenRecoveryGuardTick(hwnd) {
     global fullscreenRecoveryGuards
-    Critical("On")
+    ; Deliberately NOT Critical: a hung game window must never be able to
+    ; freeze the whole script while this recovery timer runs.
     if (!fullscreenRecoveryGuards.Has(hwnd)) {
         return
     }
@@ -1403,11 +1840,14 @@ FullscreenRecoveryGuardTick(hwnd) {
 
     now := A_TickCount
     minimized := DllCall("IsIconic", "Ptr", hwnd, "Int")
+    visible := DllCall("IsWindowVisible", "Ptr", hwnd, "Int")
     foreground := DllCall("GetForegroundWindow", "Ptr") = hwnd
     fullscreenBounds := IsWindowFullscreenLike(hwnd)
     ; A global hotkey is allowed to request focus, but Windows can legitimately
-    ; deny that request.  A visible window is already a successful resume.
-    ready := !minimized
+    ; deny that request.  Visibility is mandatory: SW_HIDE leaves a window
+    ; non-iconic, so checking only IsIconic would falsely finalize recovery
+    ; while the game was still parked and invisible.
+    ready := !minimized && visible
 
     if (ready) {
         if (!guard.stableSince) {
@@ -1449,6 +1889,7 @@ CaptureProcessResourceState(pid) {
         , "Int", 4, "Ptr", powerInfo.Ptr, "UInt", powerInfo.Size, "Int") ; ProcessPowerThrottling
     DllCall("CloseHandle", "Ptr", hProcess)
     return (priorityClass && affinityOk) ? {priorityClass: priorityClass, affinity: processMask
+        , created: GetProcessCreationStamp(pid)
         , memoryPriority: memoryPriorityOk ? NumGet(memoryInfo, 0, "UInt") : 0
         , powerVersion: powerThrottleOk ? NumGet(powerInfo, 0, "UInt") : 0
         , powerControlMask: powerThrottleOk ? NumGet(powerInfo, 4, "UInt") : 0
@@ -1477,8 +1918,127 @@ SetProcessPowerThrottling(hProcess, version, controlMask, stateMask) {
         , "Int", 4, "Ptr", powerInfo.Ptr, "UInt", powerInfo.Size, "Int") ; ProcessPowerThrottling
 }
 
-ApplyGameLowResourceMode(pid, resourceState) {
-    if (!IsObject(resourceState) || !resourceState.affinity) {
+GameCpuJobName(pid, created := "") {
+    if (created = "")
+        created := GetProcessCreationStamp(pid)
+    if (created = "")
+        return ""
+    return "Local\MyMainAHK-PausedGame-" pid "-" created
+}
+
+ApplyGameCpuLimiter(pid, created := "") {
+    global pausedGameCpuJobs, PAUSED_GAME_CPU_RATE
+    name := GameCpuJobName(pid, created)
+    if (name = "")
+        return false
+
+    hJob := 0
+    if pausedGameCpuJobs.Has(pid) {
+        hJob := pausedGameCpuJobs[pid].handle
+        if !hJob
+            pausedGameCpuJobs.Delete(pid)
+    }
+    if !hJob {
+        hJob := DllCall("kernel32\CreateJobObjectW", "Ptr", 0, "Str", name, "Ptr")
+        if !hJob {
+            LogFreezeAction("Game CPU limiter create failed PID " pid " error " A_LastError)
+            return false
+        }
+    }
+
+    cpuInfo := Buffer(8, 0)
+    NumPut("UInt", 0x5, cpuInfo, 0) ; ENABLE | HARD_CAP
+    NumPut("UInt", PAUSED_GAME_CPU_RATE, cpuInfo, 4)
+    if !DllCall("kernel32\SetInformationJobObject", "Ptr", hJob
+        , "Int", 15, "Ptr", cpuInfo.Ptr, "UInt", cpuInfo.Size, "Int") {
+        LogFreezeAction("Game CPU limiter configure failed PID " pid " error " A_LastError)
+        DllCall("CloseHandle", "Ptr", hJob)
+        return false
+    }
+
+    hProcess := DllCall("OpenProcess", "UInt", 0x1101, "Int", 0, "UInt", pid, "Ptr")
+    if !hProcess {
+        LogFreezeAction("Game CPU limiter process open failed PID " pid " error " A_LastError)
+        DllCall("CloseHandle", "Ptr", hJob)
+        return false
+    }
+    inThisJob := 0
+    queryOk := DllCall("kernel32\IsProcessInJob", "Ptr", hProcess, "Ptr", hJob, "Int*", &inThisJob, "Int")
+    assignOk := queryOk && inThisJob
+    if (queryOk && !inThisJob)
+        assignOk := DllCall("kernel32\AssignProcessToJobObject", "Ptr", hJob, "Ptr", hProcess, "Int")
+    DllCall("CloseHandle", "Ptr", hProcess)
+    if !assignOk {
+        LogFreezeAction("Game CPU limiter assignment failed PID " pid " error " A_LastError)
+        DllCall("CloseHandle", "Ptr", hJob)
+        return false
+    }
+    pausedGameCpuJobs[pid] := {handle: hJob, name: name, created: created}
+    LogFreezeAction("Game CPU hard cap PID " pid " rate " PAUSED_GAME_CPU_RATE "/10000")
+    return true
+}
+
+ReleaseGameCpuLimiter(pid, created := "") {
+    global pausedGameCpuJobs, pausedGameTrimScheduled
+    hJob := 0
+    closeAfter := false
+    if pausedGameCpuJobs.Has(pid) {
+        hJob := pausedGameCpuJobs[pid].handle
+    } else {
+        name := GameCpuJobName(pid, created)
+        if (name = "")
+            return true
+        hJob := DllCall("kernel32\OpenJobObjectW", "UInt", 0x10, "Int", 0, "Str", name, "Ptr") ; SET_ATTRIBUTES
+        closeAfter := true
+        if !hJob
+            return true ; no limiter exists for this legacy record
+    }
+
+    cpuInfo := Buffer(8, 0)
+    NumPut("UInt", 0, cpuInfo, 0) ; disable CPU rate control
+    NumPut("UInt", 10000, cpuInfo, 4) ; nonzero union value for API validation
+    ok := DllCall("kernel32\SetInformationJobObject", "Ptr", hJob
+        , "Int", 15, "Ptr", cpuInfo.Ptr, "UInt", cpuInfo.Size, "Int")
+    if (ok && pausedGameCpuJobs.Has(pid))
+        pausedGameCpuJobs.Delete(pid)
+    if (closeAfter || ok)
+        DllCall("CloseHandle", "Ptr", hJob)
+    trimKey := pid "|" created
+    if pausedGameTrimScheduled.Has(trimKey)
+        pausedGameTrimScheduled.Delete(trimKey)
+    if !ok
+        LogFreezeAction("Game CPU limiter release failed PID " pid " error " A_LastError)
+    return ok
+}
+
+ScheduleGameWorkingSetTrim(pid, created := "") {
+    global pausedGameTrimScheduled, PAUSED_GAME_TRIM_DELAY_MS
+    if (created = "")
+        created := GetProcessCreationStamp(pid)
+    if (created = "")
+        return false
+
+    trimKey := pid "|" created
+    if pausedGameTrimScheduled.Has(trimKey)
+        return true
+
+    helper := A_ScriptDir "\\ctrl-h-trim-helper.ahk"
+    if !FileExist(helper)
+        return false
+
+    try {
+        Run('"' A_AhkPath '" "' helper '" "' pid '" "' created '" "' FrozenStateFile() '" "throttle" "' PAUSED_GAME_TRIM_DELAY_MS '"', , "Hide")
+        pausedGameTrimScheduled[trimKey] := A_TickCount
+        LogFreezeAction("Game working-set trim scheduled PID " pid " delay " PAUSED_GAME_TRIM_DELAY_MS "ms")
+        return true
+    } catch as err {
+        LogFreezeAction("Game working-set trim schedule failed PID " pid " error " err.Message)
+        return false
+    }
+}
+
+ApplyGameLowResourceMode(pid, resourceState, created := "") {
+    if (!IsObject(resourceState)) {
         return false
     }
     hProcess := DllCall("OpenProcess", "UInt", 0x1200, "Int", 0, "UInt", pid, "Ptr")
@@ -1486,10 +2046,10 @@ ApplyGameLowResourceMode(pid, resourceState) {
         return false
     }
 
-    ; Minimize plus IDLE CPU, execution-speed throttling, and VERY_LOW memory
-    ; priority gives Windows first claim on CPU time and reclaimable pages.
-    ; Never trim the working set or alter affinity: both can destabilize a live
-    ; D3D device and make Alt+H recovery unreliable.
+    ; Minimize plus a 1% job CPU hard cap, IDLE priority, execution-speed
+    ; throttling, and VERY_LOW memory priority. The separate helper trims
+    ; reclaimable pages after a short pause-only delay; it never suspends the
+    ; process, and its state/creation checks abort it before an Alt+H restore.
     priorityOk := DllCall("SetPriorityClass", "Ptr", hProcess, "UInt", 0x40, "Int") ; IDLE_PRIORITY_CLASS
     memoryPriorityOk := true
     if (resourceState.HasProp("memoryPriority") && resourceState.memoryPriority) {
@@ -1501,10 +2061,28 @@ ApplyGameLowResourceMode(pid, resourceState) {
             , resourceState.powerControlMask | 0x1, resourceState.powerStateMask | 0x1)
     }
     DllCall("CloseHandle", "Ptr", hProcess)
+    baseApplied := priorityOk && memoryPriorityOk && powerThrottleOk
+    cpuLimitOk := false
+    if baseApplied {
+        limiterCreated := created != "" ? created : (resourceState.HasProp("created") ? resourceState.created : "")
+        cpuLimitOk := ApplyGameCpuLimiter(pid, limiterCreated)
+    }
+    trimScheduled := false
+    if (baseApplied && cpuLimitOk)
+        trimScheduled := ScheduleGameWorkingSetTrim(pid, limiterCreated)
     LogFreezeAction("Repeat-safe low-resource mode PID " pid " priority IDLE memory "
         (memoryPriorityOk ? "VERY_LOW" : "unchanged") " power "
-        (powerThrottleOk ? "THROTTLED" : "unchanged"))
-    return priorityOk && memoryPriorityOk && powerThrottleOk
+        (powerThrottleOk ? "THROTTLED" : "unchanged") " cpu "
+        (cpuLimitOk ? "HARD_CAP" : "unchanged") " working-set "
+        (trimScheduled ? "TRIM_SCHEDULED" : "not-scheduled"))
+    applied := baseApplied && cpuLimitOk
+    if !applied {
+        if cpuLimitOk
+            ReleaseGameCpuLimiter(pid, limiterCreated)
+        ; Never strand a game with only part of its original resource policy.
+        RestoreProcessResources(pid, resourceState)
+    }
+    return applied
 }
 
 ApplySuspendedLowResourceMode(pid, resourceState, trimWorkingSet := true) {
@@ -1610,7 +2188,9 @@ RestoreSuspendedProcess(pid, resourceState) {
 
 MaintainPausedProcessState() {
     global frozenProcesses
-    Critical("On")
+    ; Deliberately NOT Critical: this 250 ms timer must never block hotkeys
+    ; (a blocking call here would stall every shortcut).  The debounce guards
+    ; in the freeze/resume hotkeys already keep state transitions atomic.
     for _, processInfo in frozenProcesses {
         state := processInfo.HasProp("state") ? processInfo.state : "paused"
         if (state != "paused" || !ProcessExist(processInfo.pid)) {
@@ -1620,12 +2200,18 @@ MaintainPausedProcessState() {
             && processInfo.created != GetProcessCreationStamp(processInfo.pid)) {
             continue
         }
-        if (processInfo.HasProp("hwnd") && DllCall("IsWindow", "Ptr", processInfo.hwnd, "Int")
+        mode := processInfo.HasProp("mode") ? processInfo.mode : "suspend"
+        if (mode = "throttle") {
+            ParkGameWindows(processInfo.pid, processInfo.HasProp("hwnd") ? processInfo.hwnd : 0)
+        } else if (processInfo.HasProp("hwnd") && DllCall("IsWindow", "Ptr", processInfo.hwnd, "Int")
             && !DllCall("IsIconic", "Ptr", processInfo.hwnd, "Int")) {
             ForceMinimize(processInfo.hwnd)
         }
-        mode := processInfo.HasProp("mode") ? processInfo.mode : "suspend"
         if (mode != "throttle" && mode != "game_suspend") {
+            continue
+        }
+        if (mode = "throttle" && !ApplyGameCpuLimiter(processInfo.pid, processInfo.created)) {
+            LogFreezeAction("Game CPU limiter unavailable while paused PID " processInfo.pid)
             continue
         }
         hProcess := DllCall("OpenProcess", "UInt", 0x0200, "Int", 0, "UInt", processInfo.pid, "Ptr")
@@ -1647,6 +2233,9 @@ RestoreProcessResources(pid, resourceState) {
     if (!IsObject(resourceState)) {
         return false
     }
+    limiterCreated := resourceState.HasProp("created") ? resourceState.created : ""
+    if !ReleaseGameCpuLimiter(pid, limiterCreated)
+        return false
     hProcess := DllCall("OpenProcess", "UInt", 0x1200, "Int", 0, "UInt", pid, "Ptr")
     if (!hProcess) {
         return false
@@ -1672,21 +2261,77 @@ RestoreProcessResources(pid, resourceState) {
 }
 
 CaptureWindowPlacement(hwnd) {
-    placement := {hwnd: hwnd, minMax: 0, x: 0, y: 0, w: 0, h: 0}
+    placement := {hwnd: hwnd, minMax: 0, x: 0, y: 0, w: 0, h: 0, coordinateSpace: "legacy"}
     if (!hwnd || !DllCall("IsWindow", "Ptr", hwnd, "Int")) {
         return placement
     }
 
     try {
         placement.minMax := WinGetMinMax("ahk_id " hwnd)
-        WinGetPos(&x, &y, &w, &h, "ahk_id " hwnd)
-        placement.x := x
-        placement.y := y
-        placement.w := w
-        placement.h := h
+        if ReadWindowRectPmV2(hwnd, &rect) {
+            placement.x := rect.x
+            placement.y := rect.y
+            placement.w := rect.w
+            placement.h := rect.h
+            placement.coordinateSpace := "pmv2-physical"
+        } else {
+            WinGetPos(&x, &y, &w, &h, "ahk_id " hwnd)
+            placement.x := x
+            placement.y := y
+            placement.w := w
+            placement.h := h
+        }
     }
 
     return placement
+}
+
+ReadWindowRectPmV2(hwnd, &rect) {
+    previousContext := DllCall("User32\SetThreadDpiAwarenessContext", "Ptr", -4, "Ptr")
+    if !previousContext
+        return false
+
+    rectBuffer := Buffer(16, 0)
+    readOk := false
+    restoreOk := false
+    try {
+        currentContext := DllCall("User32\GetThreadDpiAwarenessContext", "Ptr")
+        if !DllCall("User32\AreDpiAwarenessContextsEqual", "Ptr", currentContext, "Ptr", -4, "Int")
+            return false
+        readOk := DllCall("User32\GetWindowRect", "Ptr", hwnd, "Ptr", rectBuffer.Ptr, "Int")
+        if readOk {
+            rect := {x: NumGet(rectBuffer, 0, "Int"), y: NumGet(rectBuffer, 4, "Int")
+                , w: NumGet(rectBuffer, 8, "Int") - NumGet(rectBuffer, 0, "Int")
+                , h: NumGet(rectBuffer, 12, "Int") - NumGet(rectBuffer, 4, "Int")}
+        }
+    } finally {
+        restoreOk := DllCall("User32\SetThreadDpiAwarenessContext", "Ptr", previousContext, "Ptr")
+        if !restoreOk
+            LogFreezeAction("Could not restore thread DPI context after window-rectangle capture")
+    }
+    return readOk && restoreOk
+}
+
+SetWindowRectPmV2(hwnd, x, y, w, h) {
+    previousContext := DllCall("User32\SetThreadDpiAwarenessContext", "Ptr", -4, "Ptr")
+    if !previousContext
+        return false
+
+    setOk := false
+    restoreOk := false
+    try {
+        currentContext := DllCall("User32\GetThreadDpiAwarenessContext", "Ptr")
+        if !DllCall("User32\AreDpiAwarenessContextsEqual", "Ptr", currentContext, "Ptr", -4, "Int")
+            return false
+        setOk := DllCall("User32\SetWindowPos", "Ptr", hwnd, "Ptr", 0
+            , "Int", x, "Int", y, "Int", w, "Int", h
+            , "UInt", 0x0040 | 0x4000, "Int") ; SWP_SHOWWINDOW | SWP_ASYNCWINDOWPOS
+    } finally {
+        restoreOk := DllCall("User32\SetThreadDpiAwarenessContext", "Ptr", previousContext, "Ptr")
+        if !restoreOk
+            LogFreezeAction("Could not restore thread DPI context after window-rectangle restore")
+    }
+    return setOk && restoreOk
 }
 
 RestoreProcessWindows(pid, preferredHwnd := 0, placement := 0, restoreGeometry := true) {
@@ -1717,36 +2362,32 @@ RestoreOneWindow(hwnd, placement := 0, restoreGeometry := true) {
         ; sequence for that state.
         DllCall("ShowWindowAsync", "Ptr", hwnd, "Int", 9) ; SW_RESTORE
         DllCall("OpenIcon", "Ptr", hwnd)
-        DllCall("ShowWindow", "Ptr", hwnd, "Int", 5) ; SW_SHOW
-        DllCall("SetWindowPos", "Ptr", hwnd, "Ptr", 0, "Int", 0, "Int", 0, "Int", 0, "Int", 0, "UInt", 0x0043) ; SHOW | NOMOVE | NOSIZE
-
-        if (!WaitForMinimizedState(hwnd, false, 750)) {
-            return false
-        }
+        DllCall("ShowWindowAsync", "Ptr", hwnd, "Int", 5) ; SW_SHOW
+        DllCall("SetWindowPos", "Ptr", hwnd, "Ptr", 0, "Int", 0, "Int", 0, "Int", 0, "Int", 0, "UInt", 0x0043 | 0x4000) ; SHOW | NOMOVE | NOSIZE | ASYNCWINDOWPOS
 
         if (restoreGeometry && IsObject(placement) && placement.w > 0 && placement.h > 0) {
             ; Restore the exact pre-freeze rectangle.  WinMaximize can leave a
             ; borderless game iconic or change its exclusive-fullscreen mode.
-            DllCall("SetWindowPos", "Ptr", hwnd, "Ptr", 0
-                , "Int", placement.x, "Int", placement.y
-                , "Int", placement.w, "Int", placement.h
-                , "UInt", 0x0040) ; SWP_SHOWWINDOW
+            coordinateSpace := placement.HasProp("coordinateSpace") ? placement.coordinateSpace : "legacy"
+            if (coordinateSpace = "pmv2-physical") {
+                if !SetWindowRectPmV2(hwnd, placement.x, placement.y, placement.w, placement.h)
+                    return false
+            } else {
+                DllCall("SetWindowPos", "Ptr", hwnd, "Ptr", 0
+                    , "Int", placement.x, "Int", placement.y
+                    , "Int", placement.w, "Int", placement.h
+                    , "UInt", 0x0040 | 0x4000) ; SWP_SHOWWINDOW | ASYNCWINDOWPOS
+            }
         }
 
         DllCall("BringWindowToTop", "Ptr", hwnd)
-        WinActivate("ahk_id " hwnd)
+        ; Do not synchronously activate a process whose pages are returning.
         DllCall("SetForegroundWindow", "Ptr", hwnd)
 
-        deadline := A_TickCount + 750
-        while (A_TickCount < deadline) {
-            if (!DllCall("IsIconic", "Ptr", hwnd, "Int")) {
-                return true
-            }
-            DllCall("BringWindowToTop", "Ptr", hwnd)
-            DllCall("SetForegroundWindow", "Ptr", hwnd)
-            Sleep(10)
-        }
-        return !DllCall("IsIconic", "Ptr", hwnd, "Int")
+        ; Every operation above is asynchronous. Returning immediately keeps
+        ; Alt+H responsive while a trimmed game faults its working set back in;
+        ; the fullscreen recovery guard performs readiness checks in a timer.
+        return true
     } catch {
         return false
     }
@@ -1826,6 +2467,10 @@ global f6TapCount := 0
 global f6LastTapTime := 0
 global f6TapWindow := 3000          ; 3 seconds window for 6 taps
 
+; Preserve the last nonzero default microphone level for mmmute/uunmute.
+global microphonePreviousLevel := ""
+global microphonePreviousLevelFile := A_Temp "\mic-prev-level.txt"
+
 ; Track Space gesture for active-window small mode
 global spaceTapCount := 0
 global spaceLastTapTime := 0
@@ -1838,33 +2483,60 @@ global spaceLongPressMs := 5000     ; Hold Space for 5 seconds to trigger small 
 global frozenProcesses := []        ; Array of frozen process info: {pid, hwnd, title}
 global lastPauseHotkeyTick := 0
 global lastResumeHotkeyTick := 0
+global gameControlPipeHandle := 0
+global gameControlPipeConnected := false
+global gameControlPipeReplySent := false
+global gameControlPipeReplyTick := 0
+global gameControlPipeConnectedTick := 0
+global gameControlPipeName := ""
+global gameControlPipeLastStartTick := 0
+global gameControlRequests := Map()
+global gameControlRequestOrder := []
+global pausedGameCpuJobs := Map()
+global PAUSED_GAME_CPU_RATE := 100 ; 1% of total processor cycles
+global pausedGameTrimScheduled := Map()
+global PAUSED_GAME_TRIM_DELAY_MS := 2000 ; let the normal minimize settle first
 LoadFrozenProcesses()
+StartGameControlPipe()
+SetTimer(PollGameControlPipe, 40)
 SetTimer(MaintainPausedProcessState, 250)
 global kkkkTapCount := 0
 global kkkkLastTapTime := 0
-global kkkkTapWindow := 900         ; 4 k presses must complete under 1 second
+global kkkkTapWindow := 1500        ; 4 distinct k presses must complete under 1.5 seconds
 
 ; ============================================================================
 ; HOTKEYS - Keyboard shortcuts
 ; ============================================================================
 
+; Private pass-through probe used to verify that Windows has not silently
+; removed this process's low-level keyboard hook. F24 is not assigned to any
+; user shortcut and the tilde preserves it for any future consumer.
+~*F24::
+{
+    try FileAppend(A_TickCount "|" A_Now "`n", A_Temp "\current-ahk-hook-probe.log")
+}
+
 ; Win+W - Launch Wand
 #w::
 {
+    ; Any Win chord can poison the OpenWhispr Ctrl+Win dictation listener (see
+    ; SttGuardTick); freeze it before Wand starts so keys injected during the
+    ; launch cannot toggle dictation by mistake.
+    SttGuardSuspendForWinChord()
     ; Wand is single-instance and a second launch can toggle its existing
-    ; Electron window hidden. Activate a visible instance instead; only invoke
-    ; the launcher when no usable window currently exists.
+    ; Electron window hidden. Raise a visible instance above every other app,
+    ; including fullscreen games, instead of launching a second copy; only
+    ; invoke the launcher when no usable window currently exists.
     for hwnd in WinGetList("ahk_exe Wand.exe") {
         try {
             if (WinGetTitle("ahk_id " hwnd) = "")
                 continue
-            WinRestore("ahk_id " hwnd)
             WinShow("ahk_id " hwnd)
-            WinActivate("ahk_id " hwnd)
+            ForceForegroundApplicationWindow(hwnd)
             return
         }
     }
-    Run('"C:\Users\micha\AppData\Local\Wand\Wand.exe"')
+    Run('"C:\Users\Admin\AppData\Local\Wand\Wand.exe"')
 }
 
 FindTvMonitor() {
@@ -1909,13 +2581,20 @@ MoveActiveWindowToMonitorMaximized(targetMonitor, label := "") {
         return false
     }
 
+    if (IsWindowHung(hwnd)) {
+        ToolTip("Window is not responding and cannot be moved")
+        SetTimer(() => ToolTip(), -2000)
+        return false
+    }
+
     try {
         MonitorGet(targetMonitor, &tLeft, &tTop, &tRight, &tBottom)
-        WinRestore("ahk_id " hwnd)
+        AsyncWinRestore(hwnd)
         Sleep(100)
-        WinMove(tLeft + 10, tTop + 10, , , "ahk_id " hwnd)
+        WinGetPos(, , &curW, &curH, "ahk_id " hwnd)
+        AsyncWinMove(hwnd, tLeft + 10, tTop + 10, curW, curH)
         Sleep(50)
-        WinMaximize("ahk_id " hwnd)
+        AsyncWinMaximize(hwnd)
         suffix := (label != "") ? label : ("Monitor " targetMonitor)
         ToolTip("Moved maximized to " suffix)
         SetTimer(() => ToolTip(), -1500)
@@ -1958,10 +2637,16 @@ ForceActiveWindowSmall() {
     centerX := mLeft + ((mRight - mLeft - smallW) // 2)
     centerY := mTop + ((mBottom - mTop - smallH) // 2)
 
+    if (IsWindowHung(hwnd)) {
+        ToolTip("Window is not responding and cannot be resized")
+        SetTimer(() => ToolTip(), -2000)
+        return false
+    }
+
     try {
-        WinRestore("ahk_id " hwnd)
+        AsyncWinRestore(hwnd)
         Sleep(50)
-        WinMove(centerX, centerY, smallW, smallH, "ahk_id " hwnd)
+        AsyncWinMove(hwnd, centerX, centerY, smallW, smallH)
         ToolTip("Window set to large restored (" smallW "x" smallH ")")
         SetTimer(() => ToolTip(), -1500)
         return true
@@ -2019,19 +2704,15 @@ CheckSpaceLongPress() {
 ; Uses the connected physical-monitor pair and ignores persistent virtual displays
 ^1::
 {
-    LogFreezeAction("DBG Ctrl+1 ENTER")
     try {
         hwnd := WinGetID("A")
-        LogFreezeAction("DBG Ctrl+1 got hwnd=" hwnd)
     } catch as err {
-        LogFreezeAction("DBG Ctrl+1 WinGetID ERROR: " err.Message)
         ToolTip("Error: Could not get active window")
         SetTimer(() => ToolTip(), -2000)
         return
     }
 
     if (!hwnd) {
-        LogFreezeAction("DBG Ctrl+1 no active window")
         ToolTip("No active window to move")
         SetTimer(() => ToolTip(), -1500)
         return
@@ -2040,16 +2721,13 @@ CheckSpaceLongPress() {
     ; Determine current monitor
     try {
         currentMonitor := GetWindowMonitor(hwnd)
-        LogFreezeAction("DBG Ctrl+1 monitor=" currentMonitor)
     } catch as err {
-        LogFreezeAction("DBG Ctrl+1 GetWindowMonitor ERROR: " err.Message)
         ToolTip("Error detecting current monitor: " err.Message)
         SetTimer(() => ToolTip(), -2000)
         return
     }
 
     targetMonitor := GetOtherPhysicalMonitor(currentMonitor)
-    LogFreezeAction("DBG Ctrl+1 hwnd=" hwnd " current=" currentMonitor " target=" targetMonitor " pair=" GetPhysicalMonitorPair()["count"])
     if !targetMonitor {
         ToolTip("Only 1 connected physical monitor detected")
         SetTimer(() => ToolTip(), -1800)
@@ -2065,9 +2743,17 @@ CheckSpaceLongPress() {
         return
     }
 
+    ; A hung window (e.g. a game frozen by Ctrl+H) cannot be moved and would
+    ; block the synchronous Win* calls, so abort cleanly instead.
+    if (IsWindowHung(hwnd)) {
+        ToolTip("Window is not responding and cannot be moved")
+        SetTimer(() => ToolTip(), -2000)
+        return
+    }
+
     ; Restore window first (if maximized or minimized)
     try {
-        WinRestore("ahk_id " hwnd)
+        AsyncWinRestore(hwnd)
         Sleep(100)  ; Allow time for restore to complete
     } catch as err {
         ToolTip("Error restoring window: " err.Message)
@@ -2077,9 +2763,10 @@ CheckSpaceLongPress() {
 
     ; Move to target monitor then maximize (true maximized state on target monitor)
     try {
-        WinMove(tLeft + 10, tTop + 10, , , "ahk_id " hwnd)  ; Nudge onto target monitor
+        WinGetPos(, , &curW, &curH, "ahk_id " hwnd)
+        AsyncWinMove(hwnd, tLeft + 10, tTop + 10, curW, curH)  ; Nudge onto target monitor
         Sleep(50)
-        WinMaximize("ahk_id " hwnd)
+        AsyncWinMaximize(hwnd)
         ToolTip("Moved maximized to Monitor " targetMonitor)
         SetTimer(() => ToolTip(), -1500)
     } catch as err {
@@ -2097,7 +2784,6 @@ CheckSpaceLongPress() {
     pair := GetPhysicalMonitorPair()
     primaryMon := pair["primary"]
     secondaryMon := pair["secondary"]
-    LogFreezeAction("DBG Ctrl+SC029 pair=" pair["count"] " primary=" primaryMon " secondary=" secondaryMon)
     if !primaryMon || !secondaryMon {
         ToolTip("Only 1 connected physical monitor detected")
         SetTimer(() => ToolTip(), -1800)
@@ -2422,20 +3108,522 @@ ToggleActiveAppMute()
     }
 }
 
+; mmute/unmute - control the application owning the current foreground window.
+; Resolve the process from the HWND first so the hotstring never relies on a
+; stale active-window title or on whichever process happens to be under the
+; mouse pointer.
+SetForegroundAppMute(muteState, commandName)
+{
+    hwnd := DllCall("GetForegroundWindow", "Ptr")
+    if (!hwnd || !DllCall("IsWindow", "Ptr", hwnd, "Int")) {
+        ShowCommandStatus(commandName ": no foreground app detected", 2500)
+        return false
+    }
+
+    pid := 0
+    if (!DllCall("GetWindowThreadProcessId", "Ptr", hwnd, "UInt*", &pid)
+        || !pid || pid = DllCall("GetCurrentProcessId", "UInt")) {
+        ShowCommandStatus(commandName ": no foreground app detected", 2500)
+        return false
+    }
+
+    try {
+        processName := WinGetProcessName("ahk_id " hwnd)
+    } catch {
+        processName := ""
+    }
+    if (processName = "") {
+        ShowCommandStatus(commandName ": no foreground app detected", 2500)
+        return false
+    }
+
+    nircmdPath := ResolveNirCmdPath()
+    command := '"' nircmdPath '" muteappvolume "' processName '" ' muteState
+    try {
+        exitCode := RunWait(command, , "Hide")
+    } catch as err {
+        ShowCommandStatus(commandName ": nircmd failed - " err.Message, 3000)
+        return false
+    }
+
+    if (exitCode != 0) {
+        LogFreezeAction(commandName " failed for " processName " PID " pid " exit " exitCode)
+        ShowCommandStatus(commandName ": nircmd failed (exit " exitCode ")", 3000)
+        return false
+    }
+
+    LogFreezeAction(commandName " succeeded for " processName " PID " pid)
+    ShowCommandStatus(commandName ": " (muteState ? "muted " : "unmuted ") processName)
+    return true
+}
+
+ResolveNirCmdPath()
+{
+    for path in [
+        A_WinDir "\System32\nircmd.exe",
+        A_ScriptDir "\nircmd.exe",
+        A_WinDir "\Sysnative\nircmd.exe",
+        "F:\study\repos\shells\powershell\scripts\microphone\voice_typing_tools\nircmd\nircmd.exe",
+        "F:\backup\windowsapps\installed\OpenWhispr\Runtime\resources\bin\nircmd.exe"
+    ] {
+        if FileExist(path)
+            return path
+    }
+    ; Let Windows search PATH as a final fallback; RunWait reports a clear
+    ; failure through the caller if the executable is unavailable.
+    return "nircmd.exe"
+}
+
+; mmmute/uunmute - use the CoreAudio default capture endpoint's scalar level.
+; The saved scalar is kept in memory for the current script session and in a
+; small UTF-8 file so a reload can still restore the user's previous level.
+MuteDefaultMicrophone()
+{
+    if !TryGetDefaultCaptureVolume(&level, &errorMessage) {
+        ShowCommandStatus("mmmute: could not read microphone - " errorMessage, 3000)
+        return false
+    }
+
+    if !TryGetDefaultCaptureMute(&isMuted, &errorMessage) {
+        ShowCommandStatus("mmmute: could not read microphone mute state - " errorMessage, 3000)
+        return false
+    }
+
+    if (level <= 0 && isMuted) {
+        ShowCommandStatus("mmmute: microphone is already muted")
+        return true
+    }
+
+    if (level > 0 && !SaveMicrophonePreviousLevel(level, &errorMessage)) {
+        ShowCommandStatus("mmmute: could not save microphone level - " errorMessage, 3000)
+        return false
+    }
+
+    if !TrySetDefaultCaptureVolume(0, &errorMessage) {
+        ShowCommandStatus("mmmute: could not mute microphone - " errorMessage, 3000)
+        return false
+    }
+
+    if !TrySetDefaultCaptureMute(true, &errorMessage) {
+        ShowCommandStatus("mmmute: could not set microphone mute state - " errorMessage, 3000)
+        return false
+    }
+
+    ShowCommandStatus("mmmute: microphone muted (was " FormatMicrophonePercent(level) "%)")
+    return true
+}
+
+UnmuteDefaultMicrophone()
+{
+    global microphonePreviousLevel
+
+    if !TryGetDefaultCaptureVolume(&level, &errorMessage) {
+        ShowCommandStatus("uunmute: could not read microphone - " errorMessage, 3000)
+        return false
+    }
+
+    if !TryGetDefaultCaptureMute(&isMuted, &errorMessage) {
+        ShowCommandStatus("uunmute: could not read microphone mute state - " errorMessage, 3000)
+        return false
+    }
+
+    if (level > 0 && !isMuted) {
+        ShowCommandStatus("uunmute: microphone is already unmuted at " FormatMicrophonePercent(level) "%")
+        return true
+    }
+
+    restoreLevel := level
+    if (restoreLevel <= 0 && !TryReadSavedMicrophoneLevel(&restoreLevel)) {
+        restoreLevel := 1.0
+    }
+
+    if !TrySetDefaultCaptureVolume(restoreLevel, &errorMessage) {
+        ShowCommandStatus("uunmute: could not unmute microphone - " errorMessage, 3000)
+        return false
+    }
+
+    if !TrySetDefaultCaptureMute(false, &errorMessage) {
+        ShowCommandStatus("uunmute: could not clear microphone mute state - " errorMessage, 3000)
+        return false
+    }
+
+    microphonePreviousLevel := restoreLevel
+    ShowCommandStatus("uunmute: microphone unmuted at " FormatMicrophonePercent(restoreLevel) "%")
+    return true
+}
+
+ShowCommandStatus(message, duration := 2000)
+{
+    ToolTip(message)
+    SetTimer(() => ToolTip(), -duration)
+}
+
+SaveMicrophonePreviousLevel(level, &errorMessage)
+{
+    global microphonePreviousLevel, microphonePreviousLevelFile
+    errorMessage := ""
+    file := 0
+
+    try {
+        file := FileOpen(microphonePreviousLevelFile, "w", "UTF-8-RAW")
+        file.Write(Format("{:.6f}", level))
+        file.Close()
+        file := 0
+        microphonePreviousLevel := level
+        return true
+    } catch as err {
+        if IsObject(file) {
+            try file.Close()
+        }
+        errorMessage := err.Message
+        return false
+    }
+}
+
+TryReadSavedMicrophoneLevel(&level)
+{
+    global microphonePreviousLevel, microphonePreviousLevelFile
+    level := 0.0
+
+    if TryParseMicrophoneLevel(microphonePreviousLevel, &sessionLevel) && sessionLevel > 0 {
+        level := sessionLevel
+        return true
+    }
+
+    if !FileExist(microphonePreviousLevelFile)
+        return false
+
+    try {
+        savedText := FileRead(microphonePreviousLevelFile)
+    } catch {
+        return false
+    }
+
+    if TryParseMicrophoneLevel(savedText, &fileLevel) && fileLevel > 0 {
+        level := fileLevel
+        return true
+    }
+    return false
+}
+
+TryParseMicrophoneLevel(value, &level)
+{
+    level := 0.0
+    text := Trim(value)
+    if !RegExMatch(text, "^(?:0(?:\.\d+)?|1(?:\.0+)?)$", &match)
+        return false
+    level := match[0] + 0.0
+    return true
+}
+
+FormatMicrophonePercent(level)
+{
+    return Min(100, Max(0, Round(level * 100)))
+}
+
+OpenDefaultCaptureEndpointVolume(&endpointVolume, &errorMessage)
+{
+    endpointVolume := 0
+    errorMessage := ""
+    device := 0
+    opened := false
+
+    try {
+        enumerator := ComObject(
+            "{BCDE0395-E52F-467C-8E3D-C4579291692E}",
+            "{A95664D2-9614-4F35-A746-DE8DB63617E6}")
+        ; EDataFlow=eCapture (1), ERole=eConsole (0).
+        ComCall(4, enumerator, "Int", 1, "Int", 0, "Ptr*", &device)
+
+        endpointVolumeIid := Buffer(16, 0)
+        if DllCall("ole32\CLSIDFromString", "WStr",
+            "{5CDF2C82-841E-4546-9722-0CF74078229A}",
+            "Ptr", endpointVolumeIid.Ptr, "Int") != 0 {
+            throw Error("could not create the CoreAudio endpoint-volume IID")
+        }
+
+        ; IMMDevice::Activate is vtable slot 3; CLSCTX_ALL is 0x17.
+        ComCall(3, device, "Ptr", endpointVolumeIid.Ptr, "UInt", 0x17,
+            "Ptr", 0, "Ptr*", &endpointVolume)
+        opened := true
+        return true
+    } catch as err {
+        errorMessage := err.Message
+        return false
+    } finally {
+        ReleaseCoreAudioInterface(device)
+        if !opened
+            ReleaseCoreAudioInterface(endpointVolume)
+    }
+}
+
+TryGetDefaultCaptureVolume(&volume, &errorMessage)
+{
+    volume := 0.0
+    errorMessage := ""
+    endpointVolume := 0
+
+    if !OpenDefaultCaptureEndpointVolume(&endpointVolume, &errorMessage)
+        return false
+
+    try {
+        ; IAudioEndpointVolume::GetMasterVolumeLevelScalar is slot 9.
+        ComCall(9, endpointVolume, "Float*", &volume)
+        if (volume < 0 || volume > 1)
+            throw Error("CoreAudio returned an invalid microphone level")
+        return true
+    } catch as err {
+        errorMessage := err.Message
+        return false
+    } finally {
+        ReleaseCoreAudioInterface(endpointVolume)
+    }
+}
+
+TrySetDefaultCaptureVolume(volume, &errorMessage)
+{
+    errorMessage := ""
+    endpointVolume := 0
+
+    if !OpenDefaultCaptureEndpointVolume(&endpointVolume, &errorMessage)
+        return false
+
+    try {
+        ; IAudioEndpointVolume::SetMasterVolumeLevelScalar is slot 7.
+        ComCall(7, endpointVolume, "Float", volume, "Ptr", 0)
+        return true
+    } catch as err {
+        errorMessage := err.Message
+        return false
+    } finally {
+        ReleaseCoreAudioInterface(endpointVolume)
+    }
+}
+
+TryGetDefaultCaptureMute(&isMuted, &errorMessage)
+{
+    isMuted := false
+    errorMessage := ""
+    endpointVolume := 0
+
+    if !OpenDefaultCaptureEndpointVolume(&endpointVolume, &errorMessage)
+        return false
+
+    try {
+        ; IAudioEndpointVolume::GetMute is slot 15.
+        muteValue := 0
+        ComCall(15, endpointVolume, "Int*", &muteValue)
+        isMuted := !!muteValue
+        return true
+    } catch as err {
+        errorMessage := err.Message
+        return false
+    } finally {
+        ReleaseCoreAudioInterface(endpointVolume)
+    }
+}
+
+TrySetDefaultCaptureMute(muteState, &errorMessage)
+{
+    errorMessage := ""
+    endpointVolume := 0
+
+    if !OpenDefaultCaptureEndpointVolume(&endpointVolume, &errorMessage)
+        return false
+
+    try {
+        ; IAudioEndpointVolume::SetMute is slot 14.
+        ComCall(14, endpointVolume, "Int", !!muteState, "Ptr", 0)
+        return true
+    } catch as err {
+        errorMessage := err.Message
+        return false
+    } finally {
+        ReleaseCoreAudioInterface(endpointVolume)
+    }
+}
+
+ReleaseCoreAudioInterface(interfacePtr)
+{
+    if interfacePtr {
+        ; Release returns ULONG, not HRESULT; specifying UInt prevents a
+        ; successful release count from being treated as a COM failure.
+        try ComCall(2, interfacePtr, "UInt")
+    }
+}
+
+; Force-terminate the process tree owning the foreground window.  The old
+; implementation launched taskkill.exe /T asynchronously, which could hang
+; forever on a console or game tree and gave no indication that the target
+; survived.  The helper performs bounded native TerminateProcess calls and
+; returns an exit code that this function verifies against the original PID
+; and creation stamp.
 KillForegroundApp()
 {
     hwnd := DllCall("GetForegroundWindow", "Ptr")
     if (!hwnd) {
-        return
+        ShowKkkkKillStatus("kkkk: no foreground application", true)
+        return false
     }
 
     pid := 0
     DllCall("GetWindowThreadProcessId", "Ptr", hwnd, "UInt*", &pid)
-    if (!pid || pid = DllCall("GetCurrentProcessId", "UInt")) {
-        return
+    currentPid := DllCall("GetCurrentProcessId", "UInt")
+    if (!pid || pid = currentPid) {
+        ShowKkkkKillStatus("kkkk: refused to terminate this shortcut runtime", true)
+        return false
     }
 
-    Run('taskkill.exe /T /F /PID ' pid, , "Hide")
+    try {
+        processName := WinGetProcessName("ahk_id " hwnd)
+    } catch {
+        processName := ""
+    }
+    try {
+        windowTitle := WinGetTitle("ahk_id " hwnd)
+    } catch {
+        windowTitle := ""
+    }
+
+    if (IsKkkkProtectedProcessName(processName)) {
+        ShowKkkkKillStatus("kkkk: protected system window was not terminated", true)
+        LogKkkkKill("refused protected process=" processName " pid=" pid)
+        return false
+    }
+
+    if (!ProcessExist(pid)) {
+        ShowKkkkKillStatus("kkkk: foreground application already exited", true)
+        return false
+    }
+
+    creationStamp := GetProcessCreationStamp(pid)
+    targetLabel := processName != "" ? processName : "PID " pid
+    if (windowTitle != "") {
+        targetLabel .= " (" windowTitle ")"
+    }
+    LogKkkkKill("request target=" targetLabel " pid=" pid " created=" creationStamp)
+
+    exitCode := RunKkkkKillHelper(pid, creationStamp, false)
+    if (WaitForKkkkProcessExit(pid, creationStamp, 2000)) {
+        ShowKkkkKillStatus("kkkk: force-killed " targetLabel)
+        LogKkkkKill("success target=" targetLabel " exit=" exitCode)
+        return true
+    }
+
+    ; A non-elevated script cannot terminate a higher-integrity target.  Ask
+    ; Windows for one explicit elevation only after the normal attempt failed.
+    if (!A_IsAdmin) {
+        elevatedExitCode := RunKkkkKillHelper(pid, creationStamp, true)
+        if (WaitForKkkkProcessExit(pid, creationStamp, 2500)) {
+            ShowKkkkKillStatus("kkkk: force-killed " targetLabel " (elevated)")
+            LogKkkkKill("success elevated target=" targetLabel " exit=" elevatedExitCode)
+            return true
+        }
+        exitCode := elevatedExitCode
+    }
+
+    errorText := "kkkk: could not terminate " targetLabel
+    if (!A_IsAdmin) {
+        errorText .= " (approve the elevation prompt or close the protected app)"
+    } else {
+        errorText .= " (Windows denied termination; exit " exitCode ")"
+    }
+    ShowKkkkKillStatus(errorText, true)
+    LogKkkkKill("failure target=" targetLabel " pid=" pid " exit=" exitCode
+        " admin=" A_IsAdmin)
+    return false
+}
+
+RunKkkkKillHelper(pid, creationStamp, elevated := false)
+{
+    helper := A_ScriptDir "\kkkk-kill-helper.ahk"
+    if (!FileExist(helper)) {
+        LogKkkkKill("helper missing: " helper)
+        return -1
+    }
+
+    stampArg := creationStamp != "" ? '"' creationStamp '"' : '""'
+    command := '"' A_AhkPath '" /script "' helper '" "' pid '" ' stampArg
+    if (elevated) {
+        command := "*RunAs " command
+    }
+
+    try {
+        return RunWait(command, , "Hide")
+    } catch as err {
+        LogKkkkKill("helper launch failed elevated=" elevated " error=" err.Message)
+        return -1
+    }
+}
+
+WaitForKkkkProcessExit(pid, expectedCreationStamp := "", timeoutMs := 2000)
+{
+    deadline := A_TickCount + timeoutMs
+    Loop {
+        if (!ProcessExist(pid)) {
+            return true
+        }
+
+        if (expectedCreationStamp != "") {
+            currentCreationStamp := GetProcessCreationStamp(pid)
+            if (currentCreationStamp != "" && currentCreationStamp != expectedCreationStamp) {
+                return true
+            }
+        }
+
+        if (A_TickCount >= deadline) {
+            break
+        }
+        Sleep(25)
+    }
+
+    if (!ProcessExist(pid)) {
+        return true
+    }
+    if (expectedCreationStamp != "") {
+        currentCreationStamp := GetProcessCreationStamp(pid)
+        if (currentCreationStamp != "" && currentCreationStamp != expectedCreationStamp) {
+            return true
+        }
+    }
+    return false
+}
+
+IsKkkkProtectedProcessName(processName)
+{
+    static protected := Map(
+        "autohotkey64.exe", true,
+        "autohotkeyux.exe", true,
+        "csrss.exe", true,
+        "dwm.exe", true,
+        "explorer.exe", true,
+        "lsass.exe", true,
+        "services.exe", true,
+        "sihost.exe", true,
+        "smss.exe", true,
+        "startmenuexperiencehost.exe", true,
+        "shellexperiencehost.exe", true,
+        "system", true,
+        "wininit.exe", true,
+        "winlogon.exe", true)
+    return protected.Has(StrLower(processName))
+}
+
+ShowKkkkKillStatus(message, longDuration := false)
+{
+    ToolTip(message)
+    SetTimer(() => ToolTip(), longDuration ? -4000 : -2200)
+}
+
+LogKkkkKill(message)
+{
+    try {
+        FileAppend(
+            FormatTime(, "yyyy-MM-dd HH:mm:ss") " " message
+                Chr(13) Chr(10),
+            A_Temp "\current-ahk-kkkk.log",
+            "UTF-8")
+    }
 }
 
 TrackKkkkForceKill()
@@ -2452,8 +3640,9 @@ TrackKkkkForceKill()
 
     if (kkkkTapCount >= 4) {
         kkkkTapCount := 0
-        KillForegroundApp()
+        return KillForegroundApp()
     }
+    return false
 }
 
 OpenRebootlessPerformanceMaximizer()
@@ -2463,41 +3652,406 @@ OpenRebootlessPerformanceMaximizer()
 
 OpenFirefox()
 {
-    ; Try common paths first (fastest)
+    ; Prefer the installed executable, then the registered/start-menu launchers.
     paths := [
         "C:\Program Files\Mozilla Firefox\firefox.exe",
         "C:\Program Files (x86)\Mozilla Firefox\firefox.exe",
+        "C:\Users\micha\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Firefox.lnk",
+        "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Firefox.lnk",
         EnvGet("LOCALAPPDATA") "\Microsoft\WindowsApps\firefox.exe"
     ]
 
     for p in paths {
         if FileExist(p) {
-            Run(p)
-            return
+            try {
+                Run(p)
+                return true
+            } catch {
+            }
         }
     }
 
-    ; Try registry
-    try {
-        regPath := RegRead("HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\firefox.exe")
-        if FileExist(regPath) {
-            Run(regPath)
-            return
+    ; App Paths may be registered per-machine or per-user.
+    for regKey in [
+        "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\firefox.exe",
+        "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\firefox.exe"
+    ] {
+        try {
+            regPath := Trim(RegRead(regKey), '"')
+            if FileExist(regPath) {
+                Run(regPath)
+                return true
+            }
+        } catch {
         }
     }
 
-    ; Last resort - let Windows find it
+    ; Last resort: allow Windows to resolve a registered Firefox command.
     try {
-        Run("firefox")
-        return
+        Run("firefox.exe")
+        return true
+    } catch {
     }
 
     MsgBox("Firefox not found!", "Error", "Icon!")
+    return false
+}
+
+RunApplication(executablePath, arguments := "")
+{
+    if !FileExist(executablePath)
+        return false
+
+    SplitPath(executablePath, , &workingDirectory)
+    command := '"' executablePath '"'
+    if (arguments != "")
+        command .= " " arguments
+
+    try {
+        Run(command, workingDirectory)
+        return true
+    } catch {
+        return false
+    }
+}
+
+RunFirstAvailable(paths, arguments := "")
+{
+    for path in paths {
+        if RunApplication(path, arguments)
+            return true
+    }
+    return false
+}
+
+OpenNamedApplication(name, paths, arguments := "")
+{
+    if RunFirstAvailable(paths, arguments)
+        return true
+
+    MsgBox(name " was not found or could not be launched.", "Shortcut error", "Icon!")
+    return false
+}
+
+OpenAdminDefaultTerminal()
+{
+    ; No profile argument deliberately means Windows Terminal's configured
+    ; default profile.  -w 0 reuses the existing Terminal window and opens a
+    ; new tab; when no window exists, Terminal creates the first one.
+    terminalPath := EnvGet("LOCALAPPDATA") "\Microsoft\WindowsApps\wt.exe"
+    command := FileExist(terminalPath)
+        ? '"' terminalPath '" -w 0 nt'
+        : "wt.exe -w 0 nt"
+    try {
+        Run(command)
+        return true
+    } catch as err {
+        MsgBox("Windows Terminal could not be started: " err.Message, "Shortcut error", "Icon!")
+        return false
+    }
+}
+
+OpenDaymark()
+{
+    return OpenNamedApplication("Daymark", [
+        "F:\backup\windowsapps\installed\daymark\Daymark.exe",
+        "C:\Users\micha\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Daymark.lnk"
+    ])
+}
+
+OpenProcessLasso()
+{
+    return OpenNamedApplication("Process Lasso", [
+        "F:\backup\windowsapps\installed\Process Lasso\ProcessLasso.exe"
+    ])
+}
+
+OpenFreebuff()
+{
+    return OpenNamedApplication("Freebuff", [
+        "C:\Users\micha\AppData\Local\Programs\@codebufffreebuff-desktop\Freebuff.exe",
+        "C:\Users\micha\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Freebuff.lnk"
+    ])
+}
+
+OpenDriverTools()
+{
+    tools := [
+        Map("Name", "GIGABYTE Control Center", "Path", "C:\Program Files\GIGABYTE\Control Center\GCC.exe", "Arguments", ""),
+        Map("Name", "AMD Ryzen Master", "Path", "C:\Program Files\AMD\RyzenMaster\bin\AMD Ryzen Master.exe", "Arguments", ""),
+        Map("Name", "NVIDIA App", "Path", "C:\Program Files\NVIDIA Corporation\NVIDIA App\CEF\NVIDIA App.exe", "Arguments", ""),
+        Map("Name", "AMD Software", "Path", "C:\Program Files\AMD\CNext\CNext\RadeonSoftware.exe", "Arguments", ""),
+        Map("Name", "GameSir Connect", "Path", "C:\Users\Admin\AppData\Local\Programs\GameSir Connect\GameSir Connect.exe", "Arguments", ""),
+        Map("Name", "Logi Options+", "Path", "C:\Program Files\LogiOptionsPlus\logioptionsplus.exe", "Arguments", "--disable-gpu"),
+        Map("Name", "Device Manager", "Path", A_WinDir "\System32\devmgmt.msc", "Arguments", ""),
+        Map("Name", "Snappy Driver Installer Origin 2.0.3 (automatic missing/better)", "Path", "F:\backup\windowsapps\installed\Snappy Driver Installer Origin\SDIO_x64_R886.exe", "Arguments", "-autoclose -script:scripts\install.txt")
+    ]
+
+    opened := 0
+    unavailable := ""
+    for tool in tools {
+        if RunApplication(tool["Path"], tool["Arguments"]) {
+            opened += 1
+        } else {
+            if (unavailable != "")
+                unavailable .= ", "
+            unavailable .= tool["Name"]
+        }
+    }
+
+    ; Windows Update is the only source that can promise zero pending driver
+    ; packages, so the sweep is only complete once it is open too.
+    try {
+        Run("ms-settings:windowsupdate")
+        opened += 1
+    } catch {
+        if (unavailable != "")
+            unavailable .= ", "
+        unavailable .= "Windows Update"
+    }
+
+    totalTools := tools.Length + 1
+
+    if (unavailable != "")
+        ToolTip("Driver tools opened: " opened "/" totalTools "; unavailable: " unavailable)
+    else
+        ToolTip("Driver tools opened: " opened "/" totalTools)
+    SetTimer(() => ToolTip(), -3000)
+    return opened = totalTools
+}
+
+FindApplicationWindow(processName)
+{
+    fallbackHwnd := 0
+    for hwnd in WinGetList("ahk_exe " processName) {
+        if !DllCall("IsWindow", "Ptr", hwnd, "Int")
+            continue
+        if !fallbackHwnd
+            fallbackHwnd := hwnd
+        if (DllCall("IsWindowVisible", "Ptr", hwnd, "Int")
+            && DllCall("GetWindowTextLength", "Ptr", hwnd, "Int") > 0)
+            return hwnd
+    }
+    return fallbackHwnd
+}
+
+ForceForegroundApplicationWindow(hwnd)
+{
+    if (!hwnd || !DllCall("IsWindow", "Ptr", hwnd, "Int"))
+        return false
+
+    ; Temporarily raise the window above every other app - including topmost
+    ; fullscreen games - focus it, then undo the temporary raise only when no
+    ; topmost window would immediately cover it again.
+    flags := 0x0001 | 0x0002 | 0x0040 | 0x4000 ; NOSIZE | NOMOVE | SHOWWINDOW | ASYNCWINDOWPOS
+    try wasTopmost := (WinGetExStyle("ahk_id " hwnd) & 0x8) != 0 ; WS_EX_TOPMOST
+    catch
+        return false
+    foreHwnd := DllCall("GetForegroundWindow", "Ptr")
+    foreTopmost := false
+    attached := false
+    foreThread := 0
+    thisThread := DllCall("GetCurrentThreadId", "UInt")
+    if (foreHwnd && foreHwnd != hwnd) {
+        try foreTopmost := (WinGetExStyle("ahk_id " foreHwnd) & 0x8) != 0
+        ; A fullscreen game keeps the foreground locked; borrowing its input
+        ; thread's state is what lets SetForegroundWindow actually take it.
+        foreThread := DllCall("GetWindowThreadProcessId", "Ptr", foreHwnd, "Ptr", 0, "UInt")
+        if (foreThread && foreThread != thisThread)
+            attached := DllCall("AttachThreadInput", "UInt", thisThread, "UInt", foreThread, "Int", true)
+    }
+
+    ; Bring the window up without touching its size: un-minimize a minimized
+    ; window, but never SW_RESTORE a maximized one back to small.
+    try minMax := WinGetMinMax("ahk_id " hwnd)
+    catch
+        return false
+    if (minMax = -1)
+        DllCall("ShowWindowAsync", "Ptr", hwnd, "Int", 9) ; SW_RESTORE: un-minimize only
+    else
+        DllCall("ShowWindowAsync", "Ptr", hwnd, "Int", 5) ; SW_SHOW: keep maximized geometry
+
+    DllCall("SetWindowPos", "Ptr", hwnd, "Ptr", -1, "Int", 0, "Int", 0, "Int", 0, "Int", 0, "UInt", flags) ; HWND_TOPMOST
+    DllCall("BringWindowToTop", "Ptr", hwnd, "Int")
+    DllCall("SetForegroundWindow", "Ptr", hwnd, "Int")
+
+    deadline := A_TickCount + 1000
+    while (DllCall("GetForegroundWindow", "Ptr") != hwnd && A_TickCount < deadline) {
+        DllCall("SetForegroundWindow", "Ptr", hwnd, "Int")
+        Sleep(25)
+    }
+    activated := DllCall("GetForegroundWindow", "Ptr") = hwnd
+    if (attached)
+        DllCall("AttachThreadInput", "UInt", thisThread, "UInt", foreThread, "Int", false)
+    ; Demote the temporary always-on-top raise unless the window was topmost
+    ; before or a topmost window (a fullscreen game) would sit right back
+    ; above it; otherwise the application keeps normal z-order behavior.
+    if (!wasTopmost && !foreTopmost)
+        DllCall("SetWindowPos", "Ptr", hwnd, "Ptr", -2, "Int", 0, "Int", 0, "Int", 0, "Int", 0, "UInt", flags) ; HWND_NOTOPMOST
+    return activated
+}
+
+OpenOrActivateApplication(executablePath, processName, displayName)
+{
+    if !FileExist(executablePath) {
+        ShowCommandStatus(displayName ": executable not found", 3000)
+        return false
+    }
+
+    hwnd := FindApplicationWindow(processName)
+    if (hwnd && ForceForegroundApplicationWindow(hwnd))
+        return true
+
+    try Run('"' executablePath '"')
+    catch as err {
+        ShowCommandStatus(displayName ": launch failed - " err.Message, 3000)
+        return false
+    }
+
+    deadline := A_TickCount + 10000
+    while (A_TickCount < deadline) {
+        hwnd := FindApplicationWindow(processName)
+        if (hwnd && ForceForegroundApplicationWindow(hwnd))
+            return true
+        Sleep(50)
+    }
+
+    ShowCommandStatus(displayName ": no usable window appeared", 3000)
+    return false
+}
+
+; Launch an app, or when it already runs, force its window above every other
+; app - including fullscreen games - by deriving the process name from the exe.
+OpenOrForegroundApplication(executablePath)
+{
+    SplitPath(executablePath, &processName)
+    return OpenOrActivateApplication(executablePath, processName, processName)
 }
 
 OpenGameLibraryManager()
 {
-    Run("https://game-library-michaelunkai.netlify.app/")
+    primaryPath := "F:\study\repos\game-library-manager-native\dist\GameLibrary.exe"
+    fallbackPath := "F:\study\repos\game-library-manager-native\native\dist\GameLibrary.exe"
+    executablePath := FileExist(primaryPath) ? primaryPath : fallbackPath
+    return OpenOrActivateApplication(executablePath, "GameLibrary.exe", "Game Library")
+}
+
+OpenMichStartupMaster()
+{
+    executablePath := "F:\study\Windows\Applications\Desktop\Utilities\System\Startup\Managers\mich-startup-master\build\MichStartupMaster.exe"
+    return OpenOrActivateApplication(executablePath, "MichStartupMaster.exe", "Mich Startup Master")
+}
+
+OpenEverything()
+{
+    return OpenNamedApplication("Everything", [
+        "C:\Program Files\Everything\Everything.exe",
+        "F:\study\Dev_Toolchain\programming\python\apps\systemTools\sizes\tools\Everything\everything.exe",
+        "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Everything.lnk"
+    ])
+}
+
+ForceCloseOpenWhisprProcess(processName)
+{
+    ; /IM terminates every matching Electron process, rather than only the
+    ; first PID returned by ProcessExist.  /T also removes child processes
+    ; which can otherwise keep the runtime alive after its parent exits.
+    taskkillCommand := Chr(34) . A_WinDir . "\System32\taskkill.exe" . Chr(34)
+        . " /F /T /IM " . processName
+    try RunWait(taskkillCommand, , "Hide")
+    return !ProcessExist(processName)
+}
+
+OpenWhisprProcessesAreRunning()
+{
+    for processName in [
+        "OpenWhisprWatchdog.exe",
+        "OpenWhisprLauncher.exe",
+        "OpenWhispr.exe"
+    ] {
+        if ProcessExist(processName)
+            return true
+    }
+    return false
+}
+
+StopOpenWhisprProcessSet(timeoutMs := 12000)
+{
+    ; The supervisor recreates a missing watchdog every two seconds, and the
+    ; watchdog can recreate a missing supervisor.  A single pass therefore
+    ; races with that recovery loop.  Keep closing the complete process set
+    ; until it has stayed absent for longer than the watchdog timeout.
+    deadline := A_TickCount + timeoutMs
+    quietSince := 0
+    while (A_TickCount < deadline) {
+        if !OpenWhisprProcessesAreRunning() {
+            if !quietSince
+                quietSince := A_TickCount
+            if (A_TickCount - quietSince >= 2250)
+                return true
+            Sleep(100)
+            continue
+        }
+
+        quietSince := 0
+        ; Stop the runtime and its supervisor before the watchdog.  Repeating
+        ; this tight sequence catches a supervisor launched between passes.
+        for processName in [
+            "OpenWhispr.exe",
+            "OpenWhisprLauncher.exe",
+            "OpenWhisprWatchdog.exe"
+        ] {
+            ForceCloseOpenWhisprProcess(processName)
+        }
+        Sleep(100)
+    }
+    return false
+}
+
+StartOpenWhisprAndWait(executablePath, timeoutMs := 10000)
+{
+    try Run('"' executablePath '"')
+    catch as err {
+        MsgBox("OpenWhispr launch failed: " err.Message, "Shortcut error", "Icon!")
+        return false
+    }
+
+    deadline := A_TickCount + timeoutMs
+    while (A_TickCount < deadline) {
+        if ProcessExist("OpenWhisprLauncher.exe") || ProcessExist("OpenWhispr.exe")
+            return true
+        Sleep(100)
+    }
+
+    MsgBox("OpenWhispr did not start after the restart request.", "Shortcut error", "Icon!")
+    return false
+}
+
+RestartOpenWhispr()
+{
+    static restartInProgress := false
+    executablePath := "F:\backup\windowsapps\installed\OpenWhispr\OpenWhisprLauncher.exe"
+    if !FileExist(executablePath) {
+        MsgBox("OpenWhispr launcher not found.", "Shortcut error", "Icon!")
+        return false
+    }
+
+    if restartInProgress {
+        ShowCommandStatus("ss2t: OpenWhispr restart already in progress", 2000)
+        return true
+    }
+
+    restartInProgress := true
+    try {
+        if !StopOpenWhisprProcessSet() {
+            MsgBox("OpenWhispr did not fully stop before the restart timeout.", "Shortcut error", "Icon!")
+            return false
+        }
+
+        return StartOpenWhisprAndWait(executablePath)
+    } finally {
+        restartInProgress := false
+    }
 }
 
 ~F6 Up::
@@ -2521,23 +4075,35 @@ OpenGameLibraryManager()
 ; F10 x6 tap - Emergency preserve-state suspend for frozen PC recovery
 ; Uses the same Windows power API path as: rundll32.exe powrprof.dll,SetSuspendState 0,1,0
 ; Before suspend, leave only keyboard wake enabled so wake is limited to Space/keyboard or the PC power button.
+; Runs a powercfg query with a hard deadline so a hung powercfg can never
+; block the script.  The poll loop uses Sleep, so other hotkeys keep firing.
+RunPowerConfigQuery(shell, query, deadline) {
+    exec := shell.Exec(A_ComSpec ' /c powercfg ' query)
+    while (!exec.Status && A_TickCount < deadline)
+        Sleep(50)
+    if (exec.Status != 1)
+        return ""  ; Timed out: do not block on StdOut.ReadAll().
+    return exec.StdOut.ReadAll()
+}
+
 ConfigureF10WakeSources()
 {
     shell := ComObject("WScript.Shell")
+    deadline := A_TickCount + 15000  ; bound the whole wake-source pass
 
-    programmable := shell.Exec(A_ComSpec ' /c powercfg /devicequery wake_programmable')
-    for _, device in StrSplit(Trim(programmable.StdOut.ReadAll(), "`r`n"), "`n", "`r") {
+    programmable := RunPowerConfigQuery(shell, "/devicequery wake_programmable", deadline)
+    for _, device in StrSplit(Trim(programmable, "`r`n"), "`n", "`r") {
         device := Trim(device)
         if (device != "" && InStr(device, "Keyboard")) {
-            RunWait(A_ComSpec ' /c powercfg /deviceenablewake "' device '"', , "Hide")
+            Run(A_ComSpec ' /c powercfg /deviceenablewake "' device '"', , "Hide")
         }
     }
 
-    armed := shell.Exec(A_ComSpec ' /c powercfg /devicequery wake_armed')
-    for _, device in StrSplit(Trim(armed.StdOut.ReadAll(), "`r`n"), "`n", "`r") {
+    armed := RunPowerConfigQuery(shell, "/devicequery wake_armed", deadline)
+    for _, device in StrSplit(Trim(armed, "`r`n"), "`n", "`r") {
         device := Trim(device)
         if (device != "" && !InStr(device, "Keyboard")) {
-            RunWait(A_ComSpec ' /c powercfg /devicedisablewake "' device '"', , "Hide")
+            Run(A_ComSpec ' /c powercfg /devicedisablewake "' device '"', , "Hide")
         }
     }
 }
@@ -2563,39 +4129,45 @@ ConfigureF10WakeSources()
 
 ; REMOVED: Ctrl+S and Alt+S hotkeys (were causing nano/terminal freeze issues)
 
-; Ctrl+h - INSTANT FREEZE - registered once via RegisterHotKey/MOD_NOREPEAT
-; Uses pure Windows API - starts minimize, then suspends without waiting seconds
-; No app/class exceptions: applies to games, terminals, and any other foreground app.
-; Safety boundary: this feature must never terminate the target app.
+; Ctrl+h remains the foreground wrapper; native game-card requests call the same
+; target-specific path after pinning the exact process and window identities.
 FreezeForegroundApp() {
-    global frozenProcesses, lastProcessActionError, lastPauseHotkeyTick
-    Critical("On")
+    global lastPauseHotkeyTick
     now := A_TickCount
     if (lastPauseHotkeyTick && now - lastPauseHotkeyTick < 500) {
-        return
+        return "running"
     }
     lastPauseHotkeyTick := now
-
-    ; Get foreground window directly - INSTANT
     hwnd := DllCall("GetForegroundWindow", "Ptr")
-    if (!hwnd) {
-        return
-    }
+    return PauseTargetWindow(hwnd)
+}
 
-    ; Get PID directly from handle - INSTANT
+PauseTargetWindow(hwnd, expectedPid := 0, expectedCreated := "") {
+    global frozenProcesses, lastProcessActionError
+    Critical("On")
+    if (!hwnd || !DllCall("IsWindow", "Ptr", hwnd, "Int"))
+        return "failed"
+
     pid := 0
     DllCall("GetWindowThreadProcessId", "Ptr", hwnd, "UInt*", &pid)
-    if (!pid) {
-        return
-    }
+    if (!pid || (expectedPid && pid != expectedPid))
+        return "failed"
+    created := GetProcessCreationStamp(pid)
+    if (created = "" || (expectedCreated != "" && StrUpper(created) != StrUpper(expectedCreated)))
+        return "failed"
+    targetPath := GetProcessImagePath(pid)
+    targetName := StrLower(RegExReplace(targetPath, ".*\\", ""))
+    if (pid = DllCall("GetCurrentProcessId", "UInt") || targetName = "gamelibrary.exe"
+        || targetName = "autohotkey64.exe" || targetName = "autohotkey.exe")
+        return "failed"
 
     Loop frozenProcesses.Length {
         processInfo := frozenProcesses[A_Index]
-        if (processInfo.pid != pid && processInfo.hwnd != hwnd) {
+        if (processInfo.pid != pid) {
             continue
         }
         if (processInfo.HasProp("created") && processInfo.created != ""
-            && processInfo.created != GetProcessCreationStamp(pid)) {
+            && processInfo.created != created) {
             frozenProcesses.RemoveAt(A_Index)
             SaveFrozenProcesses()
             break
@@ -2606,42 +4178,62 @@ FreezeForegroundApp() {
         CancelFullscreenRecoveryGuard(processInfo.hwnd)
         resourceState := {priorityClass: processInfo.HasProp("priorityClass") ? processInfo.priorityClass : 0
             , affinity: processInfo.HasProp("affinity") ? processInfo.affinity : 0
+            , created: processInfo.HasProp("created") ? processInfo.created : ""
             , memoryPriority: processInfo.HasProp("memoryPriority") ? processInfo.memoryPriority : 0
             , powerVersion: processInfo.HasProp("powerVersion") ? processInfo.powerVersion : 0
             , powerControlMask: processInfo.HasProp("powerControlMask") ? processInfo.powerControlMask : 0
             , powerStateMask: processInfo.HasProp("powerStateMask") ? processInfo.powerStateMask : 0}
         mode := processInfo.HasProp("mode") ? processInfo.mode : "suspend"
-        actionOk := ForceMinimize(processInfo.hwnd)
+        ; True suspension can disconnect Wand and permanently invalidate a
+        ; Direct3D device. Recover legacy suspended games before moving them to
+        ; the repeat-safe game throttle path; legacy connected records migrate
+        ; directly because they were never suspended.
+        if (mode = "game_suspend") {
+            if !RestoreSuspendedProcess(pid, resourceState) {
+                ToolTip("Ctrl+H could not recover the legacy suspended game")
+                SetTimer(() => ToolTip(), -2500)
+                return
+            }
+            mode := "throttle"
+            processInfo.mode := mode
+        } else if (mode = "connected") {
+            mode := "throttle"
+            processInfo.mode := mode
+        }
+        actionOk := ((mode = "throttle") ? ParkGameWindows(pid, processInfo.hwnd) : ForceMinimize(processInfo.hwnd))
             && ((mode = "throttle")
-                ? ApplyGameLowResourceMode(pid, resourceState)
-                : ApplySuspendedLowResourceMode(pid, resourceState, mode != "game_suspend"))
+                ? ApplyGameLowResourceMode(pid, resourceState, processInfo.created)
+                : ApplySuspendedLowResourceMode(pid, resourceState))
         if (actionOk) {
             processInfo.state := "paused"
             SaveFrozenProcesses()
+            return "paused"
         } else {
-            RestoreOneWindow(processInfo.hwnd, processInfo.HasProp("placement") ? processInfo.placement : 0, false)
+            RestoreOneWindow(processInfo.hwnd, processInfo.HasProp("placement") ? processInfo.placement : 0)
+            processInfo.state := "restore_pending"
+            SaveFrozenProcesses()
+            return "failed"
         }
-        return
     }
 
     placement := CaptureWindowPlacement(hwnd)
     wasFullscreen := IsWindowFullscreenLike(hwnd, placement)
-    ; True suspension is the only mode that immediately stops CPU and GPU work.
-    ; Games skip synchronous working-set trimming because trimming several GB
-    ; can block the hotkey thread and delay Alt+H. VERY_LOW memory priority lets
-    ; Windows reclaim game pages asynchronously while preserving instant resume.
-    mode := IsLikelyGameWindow(hwnd) ? "game_suspend" : "suspend"
+    ; Games must stay alive so Wand trainer IPC and the Direct3D device survive
+    ; indefinitely. Minimize them and apply IDLE CPU, EcoQoS execution-speed
+    ; throttling, and VERY_LOW memory priority. Ordinary applications can use
+    ; true suspension because they do not own a live game/trainer connection.
+    mode := IsLikelyGameWindow(hwnd) ? "throttle" : "suspend"
     resourceState := CaptureProcessResourceState(pid)
     if (!IsObject(resourceState)) {
         ToolTip("Ctrl+H could not capture the app's resource state")
         SetTimer(() => ToolTip(), -2500)
-        return
+        return "failed"
     }
 
     ; Track before suspension so Alt+H can recover even if the app stops repainting immediately.
-    frozenProcesses.Push({pid: pid, hwnd: hwnd, created: GetProcessCreationStamp(pid), title: "", placement: placement
+    frozenProcesses.Push({pid: pid, hwnd: hwnd, created: created, title: "", placement: placement
         , mode: mode
-        , state: "paused"
+        , state: "pausing"
         , priorityClass: IsObject(resourceState) ? resourceState.priorityClass : 0
         , affinity: IsObject(resourceState) ? resourceState.affinity : 0
         , memoryPriority: IsObject(resourceState) && resourceState.HasProp("memoryPriority") ? resourceState.memoryPriority : 0
@@ -2651,8 +4243,10 @@ FreezeForegroundApp() {
         , wasFullscreen: wasFullscreen})
     SaveFrozenProcesses()
 
-    ; Do not freeze a fullscreen game until Windows confirms that it minimized.
-    if (!ForceMinimize(hwnd)) {
+    ; Games are hidden after the normal minimize transition so self-restoring
+    ; launchers cannot surface them again while the throttle remains active.
+    windowParked := (mode = "throttle") ? ParkGameWindows(pid, hwnd) : ForceMinimize(hwnd)
+    if (!windowParked) {
         Loop frozenProcesses.Length {
             idx := frozenProcesses.Length - A_Index + 1
             if (frozenProcesses[idx].pid = pid) {
@@ -2663,12 +4257,12 @@ FreezeForegroundApp() {
         SaveFrozenProcesses()
         ToolTip("Ctrl+H could not minimize the foreground app")
         SetTimer(() => ToolTip(), -2500)
-        return
+        return "failed"
     }
 
     actionOk := (mode = "throttle")
-        ? ApplyGameLowResourceMode(pid, resourceState)
-        : ApplySuspendedLowResourceMode(pid, resourceState, mode != "game_suspend")
+        ? ApplyGameLowResourceMode(pid, resourceState, GetProcessCreationStamp(pid))
+        : ApplySuspendedLowResourceMode(pid, resourceState)
     if (!actionOk) {
         Loop frozenProcesses.Length {
             idx := frozenProcesses.Length - A_Index + 1
@@ -2678,32 +4272,44 @@ FreezeForegroundApp() {
             }
         }
         SaveFrozenProcesses()
-        RestoreOneWindow(hwnd, placement, mode != "throttle")
-        failure := (mode = "throttle") ? "could not enter safe game low-resource mode" : lastProcessActionError
-        ToolTip("Ctrl+H failed: " failure)
+        RestoreOneWindow(hwnd, placement)
+        ToolTip("Ctrl+H failed: " lastProcessActionError)
         SetTimer(() => ToolTip(), -2500)
+        return "failed"
     }
+    Loop frozenProcesses.Length {
+        if (frozenProcesses[A_Index].pid = pid && frozenProcesses[A_Index].created = created) {
+            frozenProcesses[A_Index].state := "paused"
+            break
+        }
+    }
+    SaveFrozenProcesses()
+    return "paused"
 }
 
 ; Alt+h - INSTANT UNFREEZE - registered once via RegisterHotKey/MOD_NOREPEAT
 ; Unfreezes and restores windows immediately
-RestoreFrozenApps() {
+RestoreFrozenApps(targetPid := 0, targetCreated := "", targetHwnd := 0, targeted := false) {
     global frozenProcesses, lastResumeHotkeyTick
     Critical("On")
-    now := A_TickCount
-    if (lastResumeHotkeyTick && now - lastResumeHotkeyTick < 500) {
-        return
+    if (!targeted) {
+        now := A_TickCount
+        if (lastResumeHotkeyTick && now - lastResumeHotkeyTick < 500) {
+            return "running"
+        }
+        lastResumeHotkeyTick := now
     }
-    lastResumeHotkeyTick := now
 
     count := frozenProcesses.Length
     if (count = 0) {
+        if (targeted)
+            return "running"
         ; A previous restore may have looked successful before the game
         ; minimized itself again. Re-arm the last validated persisted record so
         ; Alt+H remains an idempotent recovery key instead of becoming a no-op.
         recoveryCandidate := LoadLastRecoveryCandidate()
         if (!IsObject(recoveryCandidate)) {
-            return
+            return "running"
         }
         frozenProcesses.Push(recoveryCandidate)
         SaveFrozenProcesses()
@@ -2717,6 +4323,12 @@ RestoreFrozenApps() {
     Loop count {
         processInfo := frozenProcesses[A_Index]
 
+        if (targeted && (processInfo.pid != targetPid
+            || (processInfo.HasProp("created") && processInfo.created != targetCreated))) {
+            stillFrozen.Push(processInfo)
+            continue
+        }
+
         if (!ProcessExist(processInfo.pid)) {
             continue
         }
@@ -2729,22 +4341,30 @@ RestoreFrozenApps() {
         mode := processInfo.HasProp("mode") ? processInfo.mode : "suspend"
         resourceState := {priorityClass: processInfo.HasProp("priorityClass") ? processInfo.priorityClass : 0
             , affinity: processInfo.HasProp("affinity") ? processInfo.affinity : 0
+            , created: processInfo.HasProp("created") ? processInfo.created : ""
             , memoryPriority: processInfo.HasProp("memoryPriority") ? processInfo.memoryPriority : 0
             , powerVersion: processInfo.HasProp("powerVersion") ? processInfo.powerVersion : 0
             , powerControlMask: processInfo.HasProp("powerControlMask") ? processInfo.powerControlMask : 0
             , powerStateMask: processInfo.HasProp("powerStateMask") ? processInfo.powerStateMask : 0}
 
+        ; Close the pause window before touching process resources. The delayed
+        ; game working-set helper checks this persisted state and therefore
+        ; cannot trim pages concurrently with Alt+H.
+        processInfo.state := "resuming"
+        SaveFrozenProcesses()
+
         ; Restore CPU/power resources for games; truly resume ordinary apps.
-        resourcesRestored := (mode = "throttle")
+        resourcesRestored := (mode = "connected" || mode = "throttle")
             ? RestoreProcessResources(processInfo.pid, resourceState)
             : RestoreSuspendedProcess(processInfo.pid, resourceState)
         if (!resourcesRestored) {
+            processInfo.state := "restore_pending"
             stillFrozen.Push(processInfo)
             continue
         }
 
         placement := processInfo.HasProp("placement") ? processInfo.placement : 0
-        restored := RestoreProcessWindows(processInfo.pid, processInfo.hwnd, placement, mode != "throttle")
+        restored := RestoreProcessWindows(processInfo.pid, processInfo.hwnd, placement)
         if (restored && processInfo.HasProp("wasFullscreen") && processInfo.wasFullscreen) {
             ; Fullscreen stabilization is asynchronous. Keeping this record in
             ; state=restoring lets Ctrl+H cancel it immediately and prevents
@@ -2767,6 +4387,13 @@ RestoreFrozenApps() {
     for _, guardInfo in guardsToStart {
         StartFullscreenRecoveryGuard(guardInfo.hwnd, guardInfo.placement)
     }
+    return targeted ? GetGameControlState(targetPid, targetCreated, targetHwnd) : "running"
+}
+
+ResumeTargetProcess(pid, created, hwnd) {
+    if (!ValidateGameControlTarget(pid, created, hwnd, 0))
+        return "failed"
+    return RestoreFrozenApps(pid, created, hwnd, true)
 }
 
 ; Persist only the minimum identity/placement data needed to recover a process
@@ -2774,6 +4401,11 @@ RestoreFrozenApps() {
 ; ever resuming an unrelated process weeks later.
 FrozenStateFile() {
     return A_ScriptDir "\\frozen-processes.ini"
+}
+
+ReadFrozenCoordinateSpace(stateFile, section) {
+    coordinateSpace := StrLower(IniRead(stateFile, section, "DpiContext", "legacy"))
+    return coordinateSpace = "pmv2-physical" ? coordinateSpace : "legacy"
 }
 
 LoadLastRecoveryCandidate() {
@@ -2805,6 +4437,7 @@ LoadLastRecoveryCandidate() {
             , y: Integer(IniRead(stateFile, section, "Y", "0"))
             , w: Integer(IniRead(stateFile, section, "W", "0"))
             , h: Integer(IniRead(stateFile, section, "H", "0"))}
+        placement.coordinateSpace := ReadFrozenCoordinateSpace(stateFile, section)
         return {pid: pid, hwnd: hwnd, created: created, title: "", placement: placement
             , mode: IniRead(stateFile, section, "Mode", "suspend")
             , state: IniRead(stateFile, section, "State", "restore_pending")
@@ -2833,35 +4466,60 @@ GetProcessCreationStamp(pid) {
 SaveFrozenProcesses() {
     global frozenProcesses
     stateFile := FrozenStateFile()
+    tempFile := stateFile ".tmp-" DllCall("GetCurrentProcessId", "UInt") "-" A_TickCount "-" Random(10000, 99999)
     try {
-        IniWrite(frozenProcesses.Length, stateFile, "FrozenProcesses", "Count")
-        for index, processInfo in frozenProcesses {
-            section := "FrozenProcess" index
-            placement := processInfo.HasProp("placement") ? processInfo.placement : 0
-            IniWrite(processInfo.pid, stateFile, section, "Pid")
-            IniWrite(processInfo.hwnd, stateFile, section, "Hwnd")
-            IniWrite(processInfo.HasProp("created") ? processInfo.created : "", stateFile, section, "Created")
-            IniWrite(processInfo.HasProp("mode") ? processInfo.mode : "suspend", stateFile, section, "Mode")
-            IniWrite(processInfo.HasProp("state") ? processInfo.state : "paused", stateFile, section, "State")
-            IniWrite(processInfo.HasProp("priorityClass") ? processInfo.priorityClass : 0, stateFile, section, "PriorityClass")
-            IniWrite(processInfo.HasProp("affinity") ? processInfo.affinity : 0, stateFile, section, "Affinity")
-            IniWrite(processInfo.HasProp("memoryPriority") ? processInfo.memoryPriority : 0, stateFile, section, "MemoryPriority")
-            IniWrite(processInfo.HasProp("powerVersion") ? processInfo.powerVersion : 0, stateFile, section, "PowerVersion")
-            IniWrite(processInfo.HasProp("powerControlMask") ? processInfo.powerControlMask : 0, stateFile, section, "PowerControlMask")
-            IniWrite(processInfo.HasProp("powerStateMask") ? processInfo.powerStateMask : 0, stateFile, section, "PowerStateMask")
-            IniWrite(processInfo.HasProp("wasFullscreen") && processInfo.wasFullscreen ? 1 : 0, stateFile, section, "WasFullscreen")
-            IniWrite(IsObject(placement) ? placement.minMax : 0, stateFile, section, "MinMax")
-            IniWrite(IsObject(placement) ? placement.x : 0, stateFile, section, "X")
-            IniWrite(IsObject(placement) ? placement.y : 0, stateFile, section, "Y")
-            IniWrite(IsObject(placement) ? placement.w : 0, stateFile, section, "W")
-            IniWrite(IsObject(placement) ? placement.h : 0, stateFile, section, "H")
+        IniWrite(frozenProcesses.Length, tempFile, "FrozenProcesses", "Count")
+        if (frozenProcesses.Length > 0) {
+            for index, processInfo in frozenProcesses
+                WriteFrozenProcessRecord(tempFile, index, processInfo)
+        } else {
+            ; Keep the existing section-1 recovery candidate even when the
+            ; current active count is zero. Alt+H still validates PID, creation
+            ; time, and window state before it can restore that fallback.
+            PreserveFrozenRecoveryRecord(stateFile, tempFile)
         }
-        ; Keep section 1 as the idempotent last-game fallback, but remove older
-        ; numbered records so Alt+H can never revive an unrelated stale window.
-        firstObsolete := Max(frozenProcesses.Length + 1, 2)
-        Loop 33 - firstObsolete {
-            IniDelete(stateFile, "FrozenProcess" (firstObsolete + A_Index - 1))
-        }
+        if !DllCall("MoveFileExW", "WStr", tempFile, "WStr", stateFile, "UInt", 0x9, "Int")
+            throw OSError(A_LastError, "MoveFileEx", "Could not atomically publish the frozen-process state.")
+    } catch as ex {
+        LogFreezeAction("Could not publish frozen-process state atomically: " ex.Message)
+        if FileExist(tempFile)
+            try FileDelete(tempFile)
+    }
+}
+
+WriteFrozenProcessRecord(path, index, processInfo) {
+    section := "FrozenProcess" index
+    placement := processInfo.HasProp("placement") ? processInfo.placement : 0
+    IniWrite(processInfo.pid, path, section, "Pid")
+    IniWrite(processInfo.hwnd, path, section, "Hwnd")
+    IniWrite(processInfo.HasProp("created") ? processInfo.created : "", path, section, "Created")
+    IniWrite(processInfo.HasProp("mode") ? processInfo.mode : "suspend", path, section, "Mode")
+    IniWrite(processInfo.HasProp("state") ? processInfo.state : "paused", path, section, "State")
+    IniWrite(processInfo.HasProp("priorityClass") ? processInfo.priorityClass : 0, path, section, "PriorityClass")
+    IniWrite(processInfo.HasProp("affinity") ? processInfo.affinity : 0, path, section, "Affinity")
+    IniWrite(processInfo.HasProp("memoryPriority") ? processInfo.memoryPriority : 0, path, section, "MemoryPriority")
+    IniWrite(processInfo.HasProp("powerVersion") ? processInfo.powerVersion : 0, path, section, "PowerVersion")
+    IniWrite(processInfo.HasProp("powerControlMask") ? processInfo.powerControlMask : 0, path, section, "PowerControlMask")
+    IniWrite(processInfo.HasProp("powerStateMask") ? processInfo.powerStateMask : 0, path, section, "PowerStateMask")
+    IniWrite(processInfo.HasProp("wasFullscreen") && processInfo.wasFullscreen ? 1 : 0, path, section, "WasFullscreen")
+    IniWrite(IsObject(placement) ? placement.minMax : 0, path, section, "MinMax")
+    IniWrite(IsObject(placement) ? placement.x : 0, path, section, "X")
+    IniWrite(IsObject(placement) ? placement.y : 0, path, section, "Y")
+    IniWrite(IsObject(placement) ? placement.w : 0, path, section, "W")
+    IniWrite(IsObject(placement) ? placement.h : 0, path, section, "H")
+    IniWrite(IsObject(placement) && placement.HasProp("coordinateSpace") ? placement.coordinateSpace : "legacy", path, section, "DpiContext")
+}
+
+PreserveFrozenRecoveryRecord(sourcePath, targetPath) {
+    if !FileExist(sourcePath)
+        return
+    keys := ["Pid", "Hwnd", "Created", "Mode", "State", "PriorityClass", "Affinity"
+        , "MemoryPriority", "PowerVersion", "PowerControlMask", "PowerStateMask", "WasFullscreen"
+        , "MinMax", "X", "Y", "W", "H", "DpiContext"]
+    for _, key in keys {
+        value := IniRead(sourcePath, "FrozenProcess1", key, "__missing__")
+        if (value != "__missing__")
+            IniWrite(value, targetPath, "FrozenProcess1", key)
     }
 }
 
@@ -2887,8 +4545,11 @@ LoadFrozenProcesses() {
             || (created != "" && created != GetProcessCreationStamp(pid))) {
             continue
         }
-        placement := {hwnd: hwnd, minMax: Integer(IniRead(stateFile, section, "MinMax", "0")), x: Integer(IniRead(stateFile, section, "X", "0")), y: Integer(IniRead(stateFile, section, "Y", "0")), w: Integer(IniRead(stateFile, section, "W", "0")), h: Integer(IniRead(stateFile, section, "H", "0"))}
+        placement := {hwnd: hwnd, minMax: Integer(IniRead(stateFile, section, "MinMax", "0")), x: Integer(IniRead(stateFile, section, "X", "0")), y: Integer(IniRead(stateFile, section, "Y", "0")), w: Integer(IniRead(stateFile, section, "W", "0")), h: Integer(IniRead(stateFile, section, "H", "0"))
+            , coordinateSpace: ReadFrozenCoordinateSpace(stateFile, section)}
         mode := IniRead(stateFile, section, "Mode", "suspend")
+        if (mode = "connected")
+            mode := "throttle"
         state := IniRead(stateFile, section, "State", "paused")
         priorityClass := Integer(IniRead(stateFile, section, "PriorityClass", "0"))
         affinity := Integer(IniRead(stateFile, section, "Affinity", "0"))
@@ -2905,8 +4566,8 @@ LoadFrozenProcesses() {
         frozenProcesses.Push(processInfo)
         if (mode = "throttle") {
             resourceState := {priorityClass: priorityClass, affinity: affinity, memoryPriority: memoryPriority
-                , powerVersion: powerVersion, powerControlMask: powerControlMask, powerStateMask: powerStateMask}
-            ApplyGameLowResourceMode(pid, resourceState)
+                , created: created, powerVersion: powerVersion, powerControlMask: powerControlMask, powerStateMask: powerStateMask}
+            ApplyGameLowResourceMode(pid, resourceState, created)
         }
     }
     SaveFrozenProcesses()
@@ -3246,7 +4907,12 @@ ForceThreeWaySplit(target) {
 }
 
 ; kkkk - Force kill the foreground application (no mercy)
-~*k::TrackKkkkForceKill()
+~*k::
+{
+    TrackKkkkForceKill()
+    ; Count distinct taps, not autorepeat events from holding K.
+    KeyWait("k")
+}
 
 ; yyyt - Open YouTube account chooser silently (no terminal window)
 :*:yyyt::
@@ -3291,7 +4957,7 @@ ForceThreeWaySplit(target) {
 ; allit - Open Everything search
 :*:allit::
 {
-    Run('"F:\backup\windowsapps\installed\Everything\everything.exe"')
+    OpenEverything()
 }
 
 ; ddownloads - Open Downloads folder
@@ -3300,16 +4966,77 @@ ForceThreeWaySplit(target) {
     Run("explorer.exe shell:Downloads")
 }
 
-; rrer - Open new terminal
+; rrer - Open a new Windows Terminal tab using its configured default profile
 :*:rrer::
 {
-    Run('"' A_WinDir '\System32\wscript.exe" "C:\Users\micha\.codex\tools\terminal\Open-AdminWindowsTerminal.vbs"')
+    OpenAdminDefaultTerminal()
+}
+
+; DDDDD - Open Daymark
+:*:ddddd::
+{
+    OpenDaymark()
+}
+
+; pplex - Immediately open Plex Media Server without a terminal
+:*:pplex::
+{
+    RunApplication("F:\backup\windowsapps\installed\plex\Plex Media Server.exe")
+}
+
+; ddrivers - Open every driver vendor app, Device Manager, SDIO, and Windows Update
+:*:ddrivers::
+{
+    OpenDriverTools()
+}
+
+; mmmute - Mute the default CoreAudio capture endpoint
+:*:mmmute::
+{
+    MuteDefaultMicrophone()
+}
+
+; uunmute - Restore the saved default CoreAudio capture level
+:*:uunmute::
+{
+    UnmuteDefaultMicrophone()
+}
+
+; mmute - Mute the app owning the current foreground window
+:*:mmute::
+{
+    SetForegroundAppMute(1, "mmute")
+}
+
+; unmute - Unmute the app owning the current foreground window
+:*:unmute::
+{
+    SetForegroundAppMute(0, "unmute")
 }
 
 ; xccc - Open Google Chrome
 :*:xccc::
 {
-    Run('"C:\Program Files\Google\Chrome\Application\chrome.exe"')
+    OpenOrForegroundApplication("C:\Program Files\Google\Chrome\Application\chrome.exe")
+}
+
+; ggmail - Open Gmail (account u/2) in Chrome profile 2
+:*:ggmail::
+{
+    Run('"C:\Program Files\Google\Chrome\Application\chrome.exe" --profile-directory="Profile 2" "https://mail.google.com/mail/u/2/#inbox"')
+}
+
+; xccx - Open Chrome profile for michaelovsky55@gmail.com
+:*:xccx::
+{
+    chromePath := "C:\Program Files\Google\Chrome\Application\chrome.exe"
+    dir := ChromeProfileDirForEmail("michaelovsky55@gmail.com")
+    if (dir = "") {
+        ToolTip("xccx: no Chrome profile signed in as michaelovsky55@gmail.com")
+        SetTimer(() => ToolTip(), -2500)
+        return
+    }
+    Run('"' chromePath '" --profile-directory="' dir '"')
 }
 
 ; ffff - Open Firefox (auto-find)
@@ -3405,28 +5132,31 @@ ForceThreeWaySplit(target) {
 ; asc - Open Advanced SystemCare
 :*:asc::
 {
-    Run('"C:\Program Files (x86)\IObit\Advanced SystemCare\ASC.exe"')
+    OpenOrForegroundApplication("C:\Program Files (x86)\IObit\Advanced SystemCare\ASC.exe")
 }
 
 ; gggit - Open GitHub Desktop
 :*:gggit::
 {
-    Run('"C:\Users\micha\AppData\Local\GitHubDesktop\GitHubDesktop.exe"')
+    OpenOrForegroundApplication("C:\Users\micha\AppData\Local\GitHubDesktop\GitHubDesktop.exe")
 }
 
-; cococo - Open Codex Desktop
-:*:cococo::
+; plaso - Open Process Lasso
+:*:plaso::
 {
-    Run('codex://')
-    if WinWait("Codex ahk_exe Codex.exe", , 5) {
-        WinActivate("Codex ahk_exe Codex.exe")
-    }
+    OpenProcessLasso()
+}
+
+; fbuff - Open Freebuff
+:*:fbuff::
+{
+    OpenFreebuff()
 }
 
 ; qqbit - Open qBittorrent
 :*:qqbit::
 {
-    Run('"C:\Program Files\qBittorrent\qbittorrent.exe"')
+    OpenOrForegroundApplication("C:\Program Files\qBittorrent\qbittorrent.exe")
 }
 
 ; iinstalled - Open installed apps folder
@@ -3438,7 +5168,7 @@ ForceThreeWaySplit(target) {
 ; savegame - Open GameSave Manager
 :*:savegame::
 {
-    Run('"F:\backup\windowsapps\installed\gamesavemanager\gs_mngr_3.exe"')
+    OpenOrForegroundApplication("F:\backup\windowsapps\installed\gamesavemanager\gs_mngr_3.exe")
 }
 
 ; ssave - Open and relaunch GameSave Manager
@@ -3455,25 +5185,143 @@ ForceThreeWaySplit(target) {
 ; rrram - Open RAM Monitor Pro
 :*:rrram::
 {
-    Run('"F:\study\Dev_Toolchain\programming\python\apps\RamManager\dist\RAM Monitor Pro\RAM Monitor Pro.exe"')
+    OpenOrForegroundApplication("F:\study\Dev_Toolchain\programming\python\apps\RamManager\dist\RAM Monitor Pro\RAM Monitor Pro.exe")
 }
 
 ; rrevo - Open Revo Uninstaller Pro
 :*:rrevo::
 {
-    Run('"C:\Program Files\VS Revo Group\Revo Uninstaller Pro\RevoUninPro.exe"')
+    OpenOrForegroundApplication("C:\Program Files\VS Revo Group\Revo Uninstaller Pro\RevoUninPro.exe")
 }
 
-; ggggg - Open Game Library Manager web app
+; ggggg - Open the native Game Library, or foreground its existing window
 :*:ggggg::
 {
     OpenGameLibraryManager()
 }
 
+; sstartup - Open Mich Startup Master, or foreground its existing window
+:*:sstartup::
+{
+    OpenMichStartupMaster()
+}
+
+; sstart - Open Mich Startup Master, or foreground its existing window
+:*:sstart::
+{
+    OpenMichStartupMaster()
+}
+
+; sspeed - Open OpenSpeedy, or force its window over everything including fullscreen games
+:*:sspeed::
+{
+    OpenOrForegroundApplication("F:\backup\windowsapps\installed\OpenSpeedy\openspeedy.exe")
+}
+
+; zzcode - Open ZCode, or force its window over everything including fullscreen games
+:*:zzcode::
+{
+    OpenOrForegroundApplication("F:\backup\windowsapps\installed\ZCode\ZCode.exe")
+}
+
+; mmed - Open the black cinema app in the default browser
+:*:mmed::
+{
+    Run("https://black-cinema-app.vercel.app/")
+}
+
+; rrotate - Open Auto IP Changer, or force its window over everything including fullscreen games
+:*:rrotate::
+{
+    OpenOrForegroundApplication("F:\study\projects\IpRotator\AutoIpChanger.exe")
+}
+
+; ssplit - Open Monitor Isolate, or force its window over everything including fullscreen games
+:*:ssplit::
+{
+    OpenOrForegroundApplication("F:\study\Windows\Applications\PowerShell\Automation\OpenCode\Scripts\starnet\monitor-isolate\dist\MonitorIsolate.exe")
+}
+
+; sskill <appname> - Kill everything related to the app via the profile skill function
+; Type sskill, then the app name (e.g. chrome), then Enter - the trigger waits
+; up to two minutes for you to type it, showing what it captured live. Kept
+; keystrokes are swallowed so nothing leaks into whatever window has focus;
+; Esc cancels. Reuses the user's own `skill` profile function so process
+; matching, services, scheduled tasks, disk images, descendant trees, and the
+; elevated retry behave identically - fully hidden, no visible terminal - and
+; the tooltip reports how many items were closed.
+:*:sskill::
+{
+    ih := InputHook("T120", "{Enter}{Esc}")
+    echo := () => ToolTip("sskill: " ih.Input "   [Enter = force kill  |  Esc = cancel]")
+    SetTimer(echo, 100)
+    ih.Start()
+    ih.Wait()
+    SetTimer(echo, 0)
+    if (ih.EndReason = "EndKey" && ih.EndKey = "Esc") {
+        ToolTip("sskill cancelled")
+        SetTimer(() => ToolTip(), -1500)
+        return
+    }
+    if (ih.EndReason != "EndKey") {
+        ToolTip()
+        return
+    }
+    targets := Trim(ih.Input)
+    if (targets = "") {
+        ToolTip("sskill: nothing typed - type an app name after sskill, then Enter")
+        SetTimer(() => ToolTip(), -3000)
+        return
+    }
+    tokens := []
+    for token in StrSplit(targets, [" ", A_Tab]) {
+        if (token != "")
+            tokens.Push(token)
+    }
+    manifest := EnvGet("USERPROFILE") "\Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1"
+    if !FileExist(manifest) {
+        ToolTip("sskill: CodexProfileFunctions module not found")
+        SetTimer(() => ToolTip(), -3000)
+        return
+    }
+    quotedList := ""
+    for token in tokens {
+        escaped := StrReplace(token, "'", "''")
+        quotedList .= (quotedList = "" ? "" : ",") "'" escaped "'"
+    }
+    resultFile := A_Temp "\sskill-result-" A_TickCount ".txt"
+    resultFileEscaped := StrReplace(resultFile, "'", "''")
+    q := Chr(34)
+    command := "Import-Module '" manifest "' -DisableNameChecking -Force"
+        . "; Initialize-CodexProfileFunctions; $n = skill @(" quotedList ")"
+        . "; Set-Content -LiteralPath '" resultFileEscaped "' ([string]$n)"
+    Run("powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -Command " q command q, , "Hide")
+    ToolTip("sskill: force-killing everything for " targets " ...")
+    deadline := A_TickCount + 20000
+    while (A_TickCount < deadline && !FileExist(resultFile))
+        Sleep(100)
+    count := ""
+    if FileExist(resultFile) {
+        try count := Trim(FileRead(resultFile))
+        try FileDelete(resultFile)
+    }
+    if (count != "")
+        ToolTip("sskill: killed " targets " - closed " count " item(s)")
+    else
+        ToolTip("sskill: kill running for " targets " (an elevated pass may need your UAC click)")
+    SetTimer(() => ToolTip(), -4000)
+}
+
+; ss2t - Force-close OpenWhispr and reopen it
+:*:ss2t::
+{
+    RestartOpenWhispr()
+}
+
 ; oobsi - Open Obsidian
 :*:oobsi::
 {
-    Run('"C:\Program Files\Obsidian\Obsidian.exe"')
+    OpenOrForegroundApplication("C:\Program Files\Obsidian\Obsidian.exe")
 }
 
 ; wwsl - Open WSL terminal
@@ -3673,7 +5521,7 @@ GetRecentWindows(count) {
 ; Hotstring: aamd -> Open AMD Ryzen Master
 :*:aamd::
 {
-    Run('"C:\Program Files\AMD\RyzenMaster\bin\AMD Ryzen Master.exe"')
+    OpenOrForegroundApplication("C:\Program Files\AMD\RyzenMaster\bin\AMD Ryzen Master.exe")
 }
 
 
@@ -3690,13 +5538,13 @@ GetRecentWindows(count) {
 ; rref - Open Macrium Reflect (requires ending character so rreflect can also work)
 ::rref::
 {
-    Run('"F:\backup\windowsapps\installed\Reflect\Reflect.exe"')
+    OpenOrForegroundApplication("F:\backup\windowsapps\installed\Reflect\Reflect.exe")
 }
 
 ; rreflect - Open Macrium Reflect
 :*:rreflect::
 {
-    Run('"F:\backup\windowsapps\installed\Reflect\Reflect.exe"')
+    OpenOrForegroundApplication("F:\backup\windowsapps\installed\Reflect\Reflect.exe")
 }
 
 ; mmacback - Run Macrium backup
@@ -3715,24 +5563,10 @@ GetRecentWindows(count) {
     SetTimer(() => ToolTip(), -2000)
 }
 
-; bbackclau - Backup Claude Code
-:*:bbackclau::
-{
-    Run('"F:\study\AI_ML\AI_and_Machine_Learning\Artificial_Intelligence\cli\claudecode\backup\backup-claudecode.bat"')
-}
-
-; rrmbackclau - Rmcc + backclau + listclau
-:*:rrmbackclau::
-{
-    Run('powershell.exe -WindowStyle Hidden -ExecutionPolicy Bypass -Command "py F:\study\AI_ML\AI_and_Machine_Learning\Artificial_Intelligence\cli\claudecode\backup\a.py; F:\study\AI_ML\AI_and_Machine_Learning\Artificial_Intelligence\cli\claudecode\backup\backup-claudecode.bat"', , "Hide")
-    ToolTip("Rmcc + backclau running")
-    SetTimer(() => ToolTip(), -2000)
-}
-
 ; ggcc - Open GIGABYTE Control Center
 :*:ggcc::
 {
-    Run('"C:\Program Files\GIGABYTE\Control Center\GCC.exe"')
+    OpenOrForegroundApplication("C:\Program Files\GIGABYTE\Control Center\GCC.exe")
 }
 
 ; lockit - Lock workstation
@@ -3777,12 +5611,6 @@ GetRecentWindows(count) {
 :*:ccdclaw::
 {
     Run('explorer.exe "C:\Users\micha\.openclaw"')
-}
-
-; ccdclau - Open .claude folder
-:*:ccdclau::
-{
-    Run('explorer.exe "C:\Users\micha\.claude"')
 }
 
 ; rregate - Restart OpenClaw gateway (kill port 18789 + relaunch VBS)
@@ -4163,12 +5991,6 @@ GetRecentWindows(count) {
     Run('explorer.exe "F:\backup\windowsapps"')
 }
 
-; cclaudecode - Open F:\backup\claudecode
-:*:cclaudecode::
-{
-    Run('explorer.exe "F:\backup\claudecode"')
-}
-
 ; oobsidion - Open F:\backup\obsidion
 :*:oobsidion::
 {
@@ -4226,13 +6048,7 @@ GetRecentWindows(count) {
 ; mmsi - Open MSI Afterburner
 :*:mmsi::
 {
-    Run('"F:\backup\windowsapps\installed\MSI Afterburner\MSIAfterburner.exe"')
-}
-
-; resres - Open elevated Windows Terminal PowerShell 5 and run macres
-:*:resres::
-{
-    Run('"' A_WinDir '\System32\wscript.exe" "C:\Users\micha\.codex\tools\terminal\Open-AdminWindowsTerminalMacres.vbs"')
+    OpenOrForegroundApplication("F:\backup\windowsapps\installed\MSI Afterburner\MSIAfterburner.exe")
 }
 
 ; launchit - Force reload this AHK script (kills old instance and relaunches)
@@ -4333,8 +6149,8 @@ CheckMcsPostRestoreMarker()
         }
 
         ; ── Hotstrings  :*:trigger::
-        if RegExMatch(line, "^:\*:([^:]+)::$", &hm) {
-            trigger := hm[1]
+        if RegExMatch(line, "^:([^:]*):([^:]+)::$", &hm) {
+            trigger := hm[2]
             raw     := (prevComment != "") ? prevComment : trigger
             desc    := NeedHelpCleanDesc(raw, trigger)
             NeedHelpCategorize(trigger, desc, c_winmgmt, c_app, c_explorer, c_clip, c_system, c_danger)
@@ -4380,7 +6196,7 @@ CheckMcsPostRestoreMarker()
         }
 
         ; ── Regular hotkeys  ^1::  #w::  !h::  ^SC029::
-        if RegExMatch(line, "^([#\^!+~]*(?:[A-Za-z][A-Za-z0-9_]*|[0-9]|SC[0-9A-Fa-f]+))::$", &km) {
+        if RegExMatch(line, "^([#\^!+~<>*]*(?:[A-Za-z][A-Za-z0-9_]*|[0-9]|F[0-9]+|SC[0-9A-Fa-f]+|Wheel(?:Up|Down)|XButton[12]))::$", &km) {
             raw := km[1]
             ; Skip bare shift lines (they are handled by counter-tap block above)
             if (raw = "~LShift" || raw = "~RShift") {
@@ -4500,7 +6316,7 @@ NeedHelpCategorize(trigger, desc, c_winmgmt, c_app, c_explorer, c_clip, c_system
         return c_winmgmt
     ; System/tools
     if InStr(d, "backup") || InStr(d, "cleanup") || InStr(d, "lock workstation") || InStr(d, "docker")
-        || InStr(d, "macrium") || InStr(d, "gateway") || InStr(d, "openclaw") || InStr(d, "claude")
+        || InStr(d, "macrium") || InStr(d, "gateway") || InStr(d, "openclaw")
         || InStr(d, "purge") || InStr(d, "terminal") || InStr(d, "wsl") || InStr(d, "disk")
         || InStr(d, "empty recycle")
         return c_system
@@ -4608,4 +6424,139 @@ F9CheckHold() {
     F9HoldStartTick := 0
     F9HoldTriggered := false
     F9IsDown := false
+}
+
+
+; ============================================================================
+; xccx helper - resolve the Chrome profile directory signed in with an email
+; ============================================================================
+; Reads Chrome Local State on every call so it stays correct even if the
+; profile folder is renamed or renumbered by Chrome later.
+ChromeProfileDirForEmail(email) {
+    localState := EnvGet("LOCALAPPDATA") "\Google\Chrome\User Data\Local State"
+    if !FileExist(localState)
+        return ""
+    try {
+        text := FileRead(localState)
+    } catch {
+        return ""
+    }
+    needle := '"user_name":"' email '"'
+    pos := InStr(text, needle)
+    if (pos = 0)
+        return ""
+    head := SubStr(text, 1, pos - 1)
+    if RegExMatch(head, '(?s).*"(Default|Profile ?\d*)"\s*:\s*\{', &m)
+        return m[1]
+    return ""
+}
+
+; ============================================================================
+; CTRL+WIN DICTATION TRIGGER GUARD
+; OpenWhispr watches its Control+Super hotkey through windows-key-listener.exe,
+; whose modifier-only hook emits KEY_DOWN whenever ANY key arrives while it
+; believes Ctrl and Win are both held. A held Win key plus a second app's
+; injected Ctrl (for example a launcher pasting after Win+W) therefore toggles
+; dictation without the user ever pressing Ctrl+Win. While Win is held with
+; any key other than Ctrl, the listener is suspended; it resumes shortly after
+; Win is released, so a plain Ctrl+Win tap still toggles recording exactly as
+; before.
+; ============================================================================
+SttGuardTick()
+{
+    global sttGuardArmed, sttGuardForeign, sttGuardSuspended, sttGuardResumeAt
+    winHeld := GetKeyState("LWin", "P") || GetKeyState("RWin", "P")
+    if (winHeld && !sttGuardArmed) {
+        sttGuardArmed := true
+        ; A Ctrl+Win tap is only clean while nothing but Ctrl joins Win. If a
+        ; previous hold left the listener suspended, stay suspended for this
+        ; hold too so its state cannot leak into a fresh tap.
+        sttGuardForeign := sttGuardSuspended
+        ; Keys released in the instant before Win went down are not part of
+        ; this chord; flush their pressed-since-last-query edges.
+        SttGuardFlushKeyEdges()
+    } else if (!winHeld && sttGuardArmed) {
+        sttGuardArmed := false
+        if (sttGuardForeign)
+            sttGuardResumeAt := A_TickCount + 250 ; grace for late injected keys
+    }
+    if (!sttGuardArmed) {
+        if (sttGuardSuspended && A_TickCount >= sttGuardResumeAt)
+            SttGuardSetSuspended(false)
+        return
+    }
+    if (!sttGuardForeign && SttGuardForeignKeyDown()) {
+        sttGuardForeign := true
+        SttGuardSetSuspended(true)
+    }
+}
+
+; Called synchronously from Win+X hotkey handlers so the listener is already
+; frozen before the launched app gets a chance to inject any keys.
+SttGuardSuspendForWinChord()
+{
+    global sttGuardArmed, sttGuardForeign
+    sttGuardArmed := true
+    sttGuardForeign := true
+    SttGuardSetSuspended(true)
+}
+
+SttGuardSetSuspended(suspend)
+{
+    global sttGuardSuspended
+    fn := suspend ? "ntdll\NtSuspendProcess" : "ntdll\NtResumeProcess"
+    for pid in SttGuardListenerPids() {
+        handle := DllCall("OpenProcess", "UInt", 0x0800, "Int", false, "UInt", pid, "Ptr") ; PROCESS_SUSPEND_RESUME
+        if (handle) {
+            DllCall(fn, "Ptr", handle)
+            DllCall("CloseHandle", "Ptr", handle)
+        }
+    }
+    sttGuardSuspended := suspend
+}
+
+SttGuardListenerPids()
+{
+    pids := []
+    try {
+        for process in ComObjGet("winmgmts:").ExecQuery("SELECT ProcessId FROM Win32_Process WHERE Name = 'windows-key-listener.exe'")
+            pids.Push(process.ProcessId)
+    } catch {
+    }
+    return pids
+}
+
+SttGuardFlushKeyEdges()
+{
+    vk := 0x08
+    while (vk <= 0xFE) {
+        DllCall("GetAsyncKeyState", "Short", vk, "Short")
+        vk += 1
+    }
+}
+
+; True when any key besides Ctrl and Win is down or was pressed since the last
+; query (mouse buttons are not part of a keyboard chord and start at VK 0x08).
+SttGuardForeignKeyDown()
+{
+    vk := 0x08
+    while (vk <= 0xFE) {
+        if (vk = 0x11 || vk = 0xA2 || vk = 0xA3 || vk = 0x5B || vk = 0x5C) {
+            vk += 1
+            continue
+        }
+        state := DllCall("GetAsyncKeyState", "Short", vk, "Short")
+        if ((state & 0x8000) || (state & 0x0001))
+            return true
+        vk += 1
+    }
+    return false
+}
+
+SttGuardOnExit(exitReason, exitCode)
+{
+    global sttGuardSuspended
+    if (sttGuardSuspended)
+        SttGuardSetSuspended(false)
+    return 0
 }

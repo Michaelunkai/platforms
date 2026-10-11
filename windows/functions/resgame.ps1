@@ -4,7 +4,7 @@
 # was copied from. The module is also force-re-imported when the copy
 # loaded in this process is stale (psm1 changed on disk) so a long-
 # running session never runs an outdated dispatcher.
-$__2scProfileModule = 'C:\Users\micha\Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1'
+$__2scProfileModule = (Join-Path $env:USERPROFILE 'Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1')
 $__2scNeedBootstrap = -not (Get-Command -Name 'Initialize-CodexProfileFunctions' -CommandType Function -ErrorAction SilentlyContinue)
 if (-not $__2scNeedBootstrap) {
     $__2scLoadedModule = Get-Module -Name 'CodexProfileFunctions' -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -28,7 +28,7 @@ if ($__2scNeedBootstrap) {
     Initialize-CodexProfileFunctions
 }
 function resgame {
-    $s = 'C:\Users\micha\.openclaw\workspace-openclaw\scripts\resgame.ps1'
+    $s = 'C:\Users\Admin\.openclaw\workspace-openclaw\scripts\resgame.ps1'
     if (Test-Path $s) {
         & $s @args
     } else {

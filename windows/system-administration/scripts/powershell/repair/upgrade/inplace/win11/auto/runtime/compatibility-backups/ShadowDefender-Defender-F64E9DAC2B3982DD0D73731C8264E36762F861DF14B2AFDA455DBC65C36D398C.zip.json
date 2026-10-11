@@ -1,0 +1,7 @@
+﻿{
+    "OriginalPath":  "C:\\Program Files\\shadowdefender\\Defender.exe",
+    "BackupPath":  "F:\\study\\Platforms\\windows\\system-administration\\scripts\\powershell\\repair\\upgrade\\inplace\\win11\\auto\\runtime\\compatibility-backups\\ShadowDefender-Defender-F64E9DAC2B3982DD0D73731C8264E36762F861DF14B2AFDA455DBC65C36D398C.zip",
+    "SHA256":  "F64E9DAC2B3982DD0D73731C8264E36762F861DF14B2AFDA455DBC65C36D398C",
+    "Reason":  "Setup appraiser blocker; no install entry, driver, service or process",
+    "ArchivedAt":  "2026-09-18T06:28:46.7440541+03:00"
+}

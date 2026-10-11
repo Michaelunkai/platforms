@@ -1,0 +1,792 @@
+2026-09-10T03:56:07 START target=C:\Windows.old system=False systemWorker=False
+2026-09-10T03:56:08 SKIP target already absent
+2026-09-22T18:54:29 START target=C:\Windows.old system=False systemWorker=False
+2026-09-22T18:54:31 SYSTEM_TASK_RUN WinSetupPostBootWindowsOldCleanupSystem
+2026-09-22T18:54:31 DELEGATED cleanup to SYSTEM worker
+2026-09-22T18:54:33 START target=C:\Windows.old system=True systemWorker=True
+2026-09-22T18:54:33 ITERATION 0 entries=6
+2026-09-22T18:54:33 PASS robocopy/mirror begin C:\Windows.old\$WINDOWS.~BT
+2026-09-22T18:54:38 PULSE robocopy C:\Windows.old\$WINDOWS.~BT running for 5s
+2026-09-22T18:54:43 PULSE robocopy C:\Windows.old\$WINDOWS.~BT running for 10s
+2026-09-22T18:54:48 PULSE robocopy C:\Windows.old\$WINDOWS.~BT running for 15s
+2026-09-22T18:54:53 PULSE robocopy C:\Windows.old\$WINDOWS.~BT running for 20s
+2026-09-22T18:54:58 PULSE robocopy C:\Windows.old\$WINDOWS.~BT running for 25s
+2026-09-22T18:55:03 PULSE robocopy C:\Windows.old\$WINDOWS.~BT running for 30s
+2026-09-22T18:55:08 PULSE robocopy C:\Windows.old\$WINDOWS.~BT running for 35s
+2026-09-22T18:55:13 PULSE robocopy C:\Windows.old\$WINDOWS.~BT running for 40s
+2026-09-22T18:55:19 PULSE robocopy C:\Windows.old\$WINDOWS.~BT running for 45s
+2026-09-22T18:55:24 PULSE robocopy C:\Windows.old\$WINDOWS.~BT running for 50s
+2026-09-22T18:55:29 PULSE robocopy C:\Windows.old\$WINDOWS.~BT running for 56s
+2026-09-22T18:55:34 PULSE robocopy C:\Windows.old\$WINDOWS.~BT running for 61s
+2026-09-22T18:55:39 PULSE robocopy C:\Windows.old\$WINDOWS.~BT running for 66s
+2026-09-22T18:55:44 PULSE robocopy C:\Windows.old\$WINDOWS.~BT running for 71s
+2026-09-22T18:55:48 PULSE robocopy C:\Windows.old\$WINDOWS.~BT running for 75s
+2026-09-22T18:55:53 PULSE robocopy C:\Windows.old\$WINDOWS.~BT running for 80s
+2026-09-22T18:55:58 PULSE robocopy C:\Windows.old\$WINDOWS.~BT running for 85s
+2026-09-22T18:56:03 PULSE robocopy C:\Windows.old\$WINDOWS.~BT running for 90s
+2026-09-22T18:56:08 PULSE robocopy C:\Windows.old\$WINDOWS.~BT running for 95s
+2026-09-22T18:56:13 PULSE robocopy C:\Windows.old\$WINDOWS.~BT running for 100s
+2026-09-22T18:56:18 PULSE robocopy C:\Windows.old\$WINDOWS.~BT running for 105s
+2026-09-22T18:56:23 PULSE robocopy C:\Windows.old\$WINDOWS.~BT running for 110s
+2026-09-22T18:56:28 PULSE robocopy C:\Windows.old\$WINDOWS.~BT running for 115s
+2026-09-22T18:56:33 PULSE robocopy C:\Windows.old\$WINDOWS.~BT running for 120s
+2026-09-22T18:56:38 PULSE robocopy C:\Windows.old\$WINDOWS.~BT running for 125s
+2026-09-22T18:56:44 PULSE robocopy C:\Windows.old\$WINDOWS.~BT running for 130s
+2026-09-22T18:56:49 PULSE robocopy C:\Windows.old\$WINDOWS.~BT running for 135s
+2026-09-22T18:56:54 PULSE robocopy C:\Windows.old\$WINDOWS.~BT running for 140s
+2026-09-22T18:56:59 PULSE robocopy C:\Windows.old\$WINDOWS.~BT running for 145s
+2026-09-22T18:57:04 PULSE robocopy C:\Windows.old\$WINDOWS.~BT running for 150s
+2026-09-22T18:57:09 PULSE robocopy C:\Windows.old\$WINDOWS.~BT running for 155s
+2026-09-22T18:57:14 PULSE robocopy C:\Windows.old\$WINDOWS.~BT running for 160s
+2026-09-22T18:57:19 PULSE robocopy C:\Windows.old\$WINDOWS.~BT running for 165s
+2026-09-22T18:57:24 PULSE robocopy C:\Windows.old\$WINDOWS.~BT running for 170s
+2026-09-22T18:57:29 PULSE robocopy C:\Windows.old\$WINDOWS.~BT running for 175s
+2026-09-22T18:57:34 PULSE robocopy C:\Windows.old\$WINDOWS.~BT running for 180s
+2026-09-22T18:57:34 TIMEOUT robocopy C:\Windows.old\$WINDOWS.~BT after 180s
+2026-09-22T18:57:34 PASS robocopy/mirror exit C:\Windows.old\$WINDOWS.~BT code=124
+2026-09-22T18:57:34 PASS rd begin C:\Windows.old\$WINDOWS.~BT
+2026-09-22T18:57:39 PULSE rd C:\Windows.old\$WINDOWS.~BT running for 5s
+2026-09-22T18:57:44 PULSE rd C:\Windows.old\$WINDOWS.~BT running for 10s
+2026-09-22T18:57:49 PULSE rd C:\Windows.old\$WINDOWS.~BT running for 15s
+2026-09-22T18:57:54 PULSE rd C:\Windows.old\$WINDOWS.~BT running for 20s
+2026-09-22T18:57:59 PULSE rd C:\Windows.old\$WINDOWS.~BT running for 25s
+2026-09-22T18:58:04 PULSE rd C:\Windows.old\$WINDOWS.~BT running for 30s
+2026-09-22T18:58:09 PULSE rd C:\Windows.old\$WINDOWS.~BT running for 35s
+2026-09-22T18:58:14 PULSE rd C:\Windows.old\$WINDOWS.~BT running for 40s
+2026-09-22T18:58:19 PULSE rd C:\Windows.old\$WINDOWS.~BT running for 45s
+2026-09-22T18:58:24 PULSE rd C:\Windows.old\$WINDOWS.~BT running for 50s
+2026-09-22T18:58:29 PULSE rd C:\Windows.old\$WINDOWS.~BT running for 55s
+2026-09-22T18:58:34 PULSE rd C:\Windows.old\$WINDOWS.~BT running for 60s
+2026-09-22T18:58:39 PULSE rd C:\Windows.old\$WINDOWS.~BT running for 65s
+2026-09-22T18:58:44 PULSE rd C:\Windows.old\$WINDOWS.~BT running for 70s
+2026-09-22T18:58:49 PULSE rd C:\Windows.old\$WINDOWS.~BT running for 75s
+2026-09-22T18:58:54 PULSE rd C:\Windows.old\$WINDOWS.~BT running for 80s
+2026-09-22T18:58:59 PULSE rd C:\Windows.old\$WINDOWS.~BT running for 85s
+2026-09-22T18:59:04 PULSE rd C:\Windows.old\$WINDOWS.~BT running for 90s
+2026-09-22T18:59:04 TIMEOUT rd C:\Windows.old\$WINDOWS.~BT after 90s
+2026-09-22T18:59:04 PASS attrib/rd begin C:\Windows.old\$WINDOWS.~BT
+2026-09-22T18:59:09 PULSE attrib/rd C:\Windows.old\$WINDOWS.~BT running for 5s
+2026-09-22T18:59:14 PULSE attrib/rd C:\Windows.old\$WINDOWS.~BT running for 10s
+2026-09-22T18:59:19 PULSE attrib/rd C:\Windows.old\$WINDOWS.~BT running for 15s
+2026-09-22T18:59:24 PULSE attrib/rd C:\Windows.old\$WINDOWS.~BT running for 20s
+2026-09-22T18:59:29 PULSE attrib/rd C:\Windows.old\$WINDOWS.~BT running for 25s
+2026-09-22T18:59:34 PULSE attrib/rd C:\Windows.old\$WINDOWS.~BT running for 30s
+2026-09-22T18:59:39 PULSE attrib/rd C:\Windows.old\$WINDOWS.~BT running for 35s
+2026-09-22T18:59:44 PULSE attrib/rd C:\Windows.old\$WINDOWS.~BT running for 40s
+2026-09-22T18:59:49 PULSE attrib/rd C:\Windows.old\$WINDOWS.~BT running for 45s
+2026-09-22T18:59:54 PULSE attrib/rd C:\Windows.old\$WINDOWS.~BT running for 50s
+2026-09-22T18:59:59 PULSE attrib/rd C:\Windows.old\$WINDOWS.~BT running for 55s
+2026-09-22T19:00:04 PULSE attrib/rd C:\Windows.old\$WINDOWS.~BT running for 60s
+2026-09-22T19:00:09 PULSE attrib/rd C:\Windows.old\$WINDOWS.~BT running for 65s
+2026-09-22T19:00:14 PULSE attrib/rd C:\Windows.old\$WINDOWS.~BT running for 70s
+2026-09-22T19:00:20 PULSE attrib/rd C:\Windows.old\$WINDOWS.~BT running for 75s
+2026-09-22T19:00:25 PULSE attrib/rd C:\Windows.old\$WINDOWS.~BT running for 80s
+2026-09-22T19:00:30 PULSE attrib/rd C:\Windows.old\$WINDOWS.~BT running for 85s
+2026-09-22T19:00:35 PULSE attrib/rd C:\Windows.old\$WINDOWS.~BT running for 90s
+2026-09-22T19:00:40 PULSE attrib/rd C:\Windows.old\$WINDOWS.~BT running for 95s
+2026-09-22T19:00:45 PULSE attrib/rd C:\Windows.old\$WINDOWS.~BT running for 100s
+2026-09-22T19:00:50 PULSE attrib/rd C:\Windows.old\$WINDOWS.~BT running for 105s
+2026-09-22T19:00:55 PULSE attrib/rd C:\Windows.old\$WINDOWS.~BT running for 111s
+2026-09-22T19:01:00 PULSE attrib/rd C:\Windows.old\$WINDOWS.~BT running for 116s
+2026-09-22T19:01:05 PULSE attrib/rd C:\Windows.old\$WINDOWS.~BT running for 121s
+2026-09-22T19:01:05 TIMEOUT attrib/rd C:\Windows.old\$WINDOWS.~BT after 120s
+2026-09-22T19:01:05 PASS robocopy/mirror begin C:\Windows.old\Program Files
+2026-09-22T19:01:06 EXIT robocopy C:\Windows.old\Program Files code=0
+2026-09-22T19:01:06 PASS robocopy/mirror exit C:\Windows.old\Program Files code=0
+2026-09-22T19:01:06 PASS rd begin C:\Windows.old\Program Files
+2026-09-22T19:01:07 EXIT rd C:\Windows.old\Program Files code=0
+2026-09-22T19:01:07 PASS attrib/rd begin C:\Windows.old\Program Files
+2026-09-22T19:01:08 EXIT attrib/rd C:\Windows.old\Program Files code=0
+2026-09-22T19:01:08 PASS robocopy/mirror begin C:\Windows.old\Program Files (x86)
+2026-09-22T19:01:09 EXIT robocopy C:\Windows.old\Program Files (x86) code=0
+2026-09-22T19:01:09 PASS robocopy/mirror exit C:\Windows.old\Program Files (x86) code=0
+2026-09-22T19:01:09 PASS rd begin C:\Windows.old\Program Files (x86)
+2026-09-22T19:01:10 EXIT rd C:\Windows.old\Program Files (x86) code=0
+2026-09-22T19:01:10 PASS attrib/rd begin C:\Windows.old\Program Files (x86)
+2026-09-22T19:01:11 EXIT attrib/rd C:\Windows.old\Program Files (x86) code=0
+2026-09-22T19:01:11 PASS robocopy/mirror begin C:\Windows.old\ProgramData
+2026-09-22T19:01:16 PULSE robocopy C:\Windows.old\ProgramData running for 5s
+2026-09-22T19:01:21 PULSE robocopy C:\Windows.old\ProgramData running for 10s
+2026-09-22T19:01:26 PULSE robocopy C:\Windows.old\ProgramData running for 15s
+2026-09-22T19:01:31 PULSE robocopy C:\Windows.old\ProgramData running for 20s
+2026-09-22T19:01:36 PULSE robocopy C:\Windows.old\ProgramData running for 25s
+2026-09-22T19:01:41 PULSE robocopy C:\Windows.old\ProgramData running for 30s
+2026-09-22T19:01:46 PULSE robocopy C:\Windows.old\ProgramData running for 35s
+2026-09-22T19:01:51 PULSE robocopy C:\Windows.old\ProgramData running for 40s
+2026-09-22T19:01:56 PULSE robocopy C:\Windows.old\ProgramData running for 45s
+2026-09-22T19:02:01 PULSE robocopy C:\Windows.old\ProgramData running for 50s
+2026-09-22T19:02:06 PULSE robocopy C:\Windows.old\ProgramData running for 55s
+2026-09-22T19:02:11 PULSE robocopy C:\Windows.old\ProgramData running for 60s
+2026-09-22T19:02:16 PULSE robocopy C:\Windows.old\ProgramData running for 65s
+2026-09-22T19:02:21 PULSE robocopy C:\Windows.old\ProgramData running for 70s
+2026-09-22T19:02:26 PULSE robocopy C:\Windows.old\ProgramData running for 75s
+2026-09-22T19:02:31 PULSE robocopy C:\Windows.old\ProgramData running for 80s
+2026-09-22T19:02:36 PULSE robocopy C:\Windows.old\ProgramData running for 85s
+2026-09-22T19:02:41 PULSE robocopy C:\Windows.old\ProgramData running for 90s
+2026-09-22T19:02:46 PULSE robocopy C:\Windows.old\ProgramData running for 95s
+2026-09-22T19:02:51 PULSE robocopy C:\Windows.old\ProgramData running for 100s
+2026-09-22T19:02:56 PULSE robocopy C:\Windows.old\ProgramData running for 105s
+2026-09-22T19:03:01 PULSE robocopy C:\Windows.old\ProgramData running for 111s
+2026-09-22T19:03:06 PULSE robocopy C:\Windows.old\ProgramData running for 116s
+2026-09-22T19:03:11 PULSE robocopy C:\Windows.old\ProgramData running for 121s
+2026-09-22T19:03:16 PULSE robocopy C:\Windows.old\ProgramData running for 126s
+2026-09-22T19:03:21 PULSE robocopy C:\Windows.old\ProgramData running for 131s
+2026-09-22T19:03:26 PULSE robocopy C:\Windows.old\ProgramData running for 136s
+2026-09-22T19:03:32 PULSE robocopy C:\Windows.old\ProgramData running for 141s
+2026-09-22T19:03:37 PULSE robocopy C:\Windows.old\ProgramData running for 146s
+2026-09-22T19:03:42 PULSE robocopy C:\Windows.old\ProgramData running for 151s
+2026-09-22T19:03:47 PULSE robocopy C:\Windows.old\ProgramData running for 156s
+2026-09-22T19:03:52 PULSE robocopy C:\Windows.old\ProgramData running for 161s
+2026-09-22T19:03:57 PULSE robocopy C:\Windows.old\ProgramData running for 166s
+2026-09-22T19:04:02 PULSE robocopy C:\Windows.old\ProgramData running for 171s
+2026-09-22T19:04:07 PULSE robocopy C:\Windows.old\ProgramData running for 176s
+2026-09-22T19:04:12 PULSE robocopy C:\Windows.old\ProgramData running for 181s
+2026-09-22T19:04:12 TIMEOUT robocopy C:\Windows.old\ProgramData after 180s
+2026-09-22T19:04:12 PASS robocopy/mirror exit C:\Windows.old\ProgramData code=124
+2026-09-22T19:04:12 PASS rd begin C:\Windows.old\ProgramData
+2026-09-22T19:04:17 PULSE rd C:\Windows.old\ProgramData running for 5s
+2026-09-22T19:04:22 PULSE rd C:\Windows.old\ProgramData running for 10s
+2026-09-22T19:04:27 PULSE rd C:\Windows.old\ProgramData running for 15s
+2026-09-22T19:04:32 PULSE rd C:\Windows.old\ProgramData running for 20s
+2026-09-22T19:04:37 PULSE rd C:\Windows.old\ProgramData running for 25s
+2026-09-22T19:04:42 PULSE rd C:\Windows.old\ProgramData running for 30s
+2026-09-22T19:04:47 PULSE rd C:\Windows.old\ProgramData running for 35s
+2026-09-22T19:04:52 PULSE rd C:\Windows.old\ProgramData running for 40s
+2026-09-22T19:04:57 PULSE rd C:\Windows.old\ProgramData running for 45s
+2026-09-22T19:05:02 PULSE rd C:\Windows.old\ProgramData running for 50s
+2026-09-22T19:05:07 PULSE rd C:\Windows.old\ProgramData running for 55s
+2026-09-22T19:05:12 PULSE rd C:\Windows.old\ProgramData running for 60s
+2026-09-22T19:05:17 PULSE rd C:\Windows.old\ProgramData running for 65s
+2026-09-22T19:05:22 PULSE rd C:\Windows.old\ProgramData running for 70s
+2026-09-22T19:05:27 PULSE rd C:\Windows.old\ProgramData running for 75s
+2026-09-22T19:05:32 PULSE rd C:\Windows.old\ProgramData running for 80s
+2026-09-22T19:05:37 PULSE rd C:\Windows.old\ProgramData running for 85s
+2026-09-22T19:05:42 PULSE rd C:\Windows.old\ProgramData running for 90s
+2026-09-22T19:05:42 TIMEOUT rd C:\Windows.old\ProgramData after 90s
+2026-09-22T19:05:42 PASS attrib/rd begin C:\Windows.old\ProgramData
+2026-09-22T19:05:47 PULSE attrib/rd C:\Windows.old\ProgramData running for 5s
+2026-09-22T19:05:52 PULSE attrib/rd C:\Windows.old\ProgramData running for 10s
+2026-09-22T19:05:57 PULSE attrib/rd C:\Windows.old\ProgramData running for 15s
+2026-09-22T19:06:02 PULSE attrib/rd C:\Windows.old\ProgramData running for 20s
+2026-09-22T19:06:07 PULSE attrib/rd C:\Windows.old\ProgramData running for 25s
+2026-09-22T19:06:12 PULSE attrib/rd C:\Windows.old\ProgramData running for 30s
+2026-09-22T19:06:17 PULSE attrib/rd C:\Windows.old\ProgramData running for 35s
+2026-09-22T19:06:22 PULSE attrib/rd C:\Windows.old\ProgramData running for 40s
+2026-09-22T19:06:27 PULSE attrib/rd C:\Windows.old\ProgramData running for 45s
+2026-09-22T19:06:32 PULSE attrib/rd C:\Windows.old\ProgramData running for 50s
+2026-09-22T19:06:37 PULSE attrib/rd C:\Windows.old\ProgramData running for 55s
+2026-09-22T19:06:42 PULSE attrib/rd C:\Windows.old\ProgramData running for 60s
+2026-09-22T19:06:47 PULSE attrib/rd C:\Windows.old\ProgramData running for 65s
+2026-09-22T19:06:52 PULSE attrib/rd C:\Windows.old\ProgramData running for 70s
+2026-09-22T19:06:57 PULSE attrib/rd C:\Windows.old\ProgramData running for 75s
+2026-09-22T19:07:03 PULSE attrib/rd C:\Windows.old\ProgramData running for 80s
+2026-09-22T19:07:08 PULSE attrib/rd C:\Windows.old\ProgramData running for 85s
+2026-09-22T19:07:13 PULSE attrib/rd C:\Windows.old\ProgramData running for 90s
+2026-09-22T19:07:18 PULSE attrib/rd C:\Windows.old\ProgramData running for 95s
+2026-09-22T19:07:23 PULSE attrib/rd C:\Windows.old\ProgramData running for 100s
+2026-09-22T19:07:28 PULSE attrib/rd C:\Windows.old\ProgramData running for 105s
+2026-09-22T19:07:33 PULSE attrib/rd C:\Windows.old\ProgramData running for 110s
+2026-09-22T19:07:38 PULSE attrib/rd C:\Windows.old\ProgramData running for 115s
+2026-09-22T19:07:43 PULSE attrib/rd C:\Windows.old\ProgramData running for 121s
+2026-09-22T19:07:43 TIMEOUT attrib/rd C:\Windows.old\ProgramData after 120s
+2026-09-22T19:07:43 PASS robocopy/mirror begin C:\Windows.old\Users
+2026-09-22T19:07:44 EXIT robocopy C:\Windows.old\Users code=2
+2026-09-22T19:07:44 PASS robocopy/mirror exit C:\Windows.old\Users code=2
+2026-09-22T19:07:44 PASS rd begin C:\Windows.old\Users
+2026-09-22T19:07:45 EXIT rd C:\Windows.old\Users code=0
+2026-09-22T19:07:45 PASS robocopy/mirror begin C:\Windows.old\WINDOWS
+2026-09-22T19:07:50 PULSE robocopy C:\Windows.old\WINDOWS running for 5s
+2026-09-22T19:07:55 PULSE robocopy C:\Windows.old\WINDOWS running for 10s
+2026-09-22T19:08:00 PULSE robocopy C:\Windows.old\WINDOWS running for 15s
+2026-09-22T19:08:05 PULSE robocopy C:\Windows.old\WINDOWS running for 20s
+2026-09-22T19:08:10 PULSE robocopy C:\Windows.old\WINDOWS running for 25s
+2026-09-22T19:08:15 PULSE robocopy C:\Windows.old\WINDOWS running for 30s
+2026-09-22T19:08:20 PULSE robocopy C:\Windows.old\WINDOWS running for 35s
+2026-09-22T19:08:25 PULSE robocopy C:\Windows.old\WINDOWS running for 40s
+2026-09-22T19:08:30 PULSE robocopy C:\Windows.old\WINDOWS running for 45s
+2026-09-22T19:08:35 PULSE robocopy C:\Windows.old\WINDOWS running for 50s
+2026-09-22T19:08:40 PULSE robocopy C:\Windows.old\WINDOWS running for 55s
+2026-09-22T19:08:45 PULSE robocopy C:\Windows.old\WINDOWS running for 60s
+2026-09-22T19:08:50 PULSE robocopy C:\Windows.old\WINDOWS running for 65s
+2026-09-22T19:08:55 PULSE robocopy C:\Windows.old\WINDOWS running for 70s
+2026-09-22T19:09:00 PULSE robocopy C:\Windows.old\WINDOWS running for 75s
+2026-09-22T19:09:05 PULSE robocopy C:\Windows.old\WINDOWS running for 80s
+2026-09-22T19:09:10 PULSE robocopy C:\Windows.old\WINDOWS running for 85s
+2026-09-22T19:09:15 PULSE robocopy C:\Windows.old\WINDOWS running for 90s
+2026-09-22T19:09:20 PULSE robocopy C:\Windows.old\WINDOWS running for 95s
+2026-09-22T19:09:25 PULSE robocopy C:\Windows.old\WINDOWS running for 100s
+2026-09-22T19:09:30 PULSE robocopy C:\Windows.old\WINDOWS running for 105s
+2026-09-22T19:09:35 PULSE robocopy C:\Windows.old\WINDOWS running for 110s
+2026-09-22T19:09:40 PULSE robocopy C:\Windows.old\WINDOWS running for 116s
+2026-09-22T19:09:45 PULSE robocopy C:\Windows.old\WINDOWS running for 121s
+2026-09-22T19:09:50 PULSE robocopy C:\Windows.old\WINDOWS running for 126s
+2026-09-22T19:09:55 PULSE robocopy C:\Windows.old\WINDOWS running for 131s
+2026-09-22T19:10:00 PULSE robocopy C:\Windows.old\WINDOWS running for 136s
+2026-09-22T19:10:05 PULSE robocopy C:\Windows.old\WINDOWS running for 141s
+2026-09-22T19:10:10 PULSE robocopy C:\Windows.old\WINDOWS running for 146s
+2026-09-22T19:10:15 PULSE robocopy C:\Windows.old\WINDOWS running for 151s
+2026-09-22T19:10:20 PULSE robocopy C:\Windows.old\WINDOWS running for 156s
+2026-09-22T19:10:25 PULSE robocopy C:\Windows.old\WINDOWS running for 161s
+2026-09-22T19:10:30 PULSE robocopy C:\Windows.old\WINDOWS running for 166s
+2026-09-22T19:10:36 PULSE robocopy C:\Windows.old\WINDOWS running for 171s
+2026-09-22T19:10:41 PULSE robocopy C:\Windows.old\WINDOWS running for 176s
+2026-09-22T19:10:46 PULSE robocopy C:\Windows.old\WINDOWS running for 181s
+2026-09-22T19:10:46 TIMEOUT robocopy C:\Windows.old\WINDOWS after 180s
+2026-09-22T19:10:46 PASS robocopy/mirror exit C:\Windows.old\WINDOWS code=124
+2026-09-22T19:10:46 PASS rd begin C:\Windows.old\WINDOWS
+2026-09-22T19:10:51 PULSE rd C:\Windows.old\WINDOWS running for 5s
+2026-09-22T19:10:56 PULSE rd C:\Windows.old\WINDOWS running for 10s
+2026-09-22T19:11:01 PULSE rd C:\Windows.old\WINDOWS running for 15s
+2026-09-22T19:11:06 PULSE rd C:\Windows.old\WINDOWS running for 20s
+2026-09-22T19:11:11 PULSE rd C:\Windows.old\WINDOWS running for 25s
+2026-09-22T19:11:16 PULSE rd C:\Windows.old\WINDOWS running for 30s
+2026-09-22T19:11:21 PULSE rd C:\Windows.old\WINDOWS running for 35s
+2026-09-22T19:11:26 PULSE rd C:\Windows.old\WINDOWS running for 40s
+2026-09-22T19:11:31 PULSE rd C:\Windows.old\WINDOWS running for 45s
+2026-09-22T19:11:36 PULSE rd C:\Windows.old\WINDOWS running for 50s
+2026-09-22T19:11:41 PULSE rd C:\Windows.old\WINDOWS running for 55s
+2026-09-22T19:11:46 PULSE rd C:\Windows.old\WINDOWS running for 60s
+2026-09-22T19:11:51 PULSE rd C:\Windows.old\WINDOWS running for 65s
+2026-09-22T19:11:56 PULSE rd C:\Windows.old\WINDOWS running for 70s
+2026-09-22T19:12:01 PULSE rd C:\Windows.old\WINDOWS running for 75s
+2026-09-22T19:12:06 PULSE rd C:\Windows.old\WINDOWS running for 80s
+2026-09-22T19:12:11 PULSE rd C:\Windows.old\WINDOWS running for 85s
+2026-09-22T19:12:16 PULSE rd C:\Windows.old\WINDOWS running for 90s
+2026-09-22T19:12:16 TIMEOUT rd C:\Windows.old\WINDOWS after 90s
+2026-09-22T19:12:16 PASS attrib/rd begin C:\Windows.old\WINDOWS
+2026-09-22T19:12:21 PULSE attrib/rd C:\Windows.old\WINDOWS running for 5s
+2026-09-22T19:12:26 PULSE attrib/rd C:\Windows.old\WINDOWS running for 10s
+2026-09-22T19:12:31 PULSE attrib/rd C:\Windows.old\WINDOWS running for 15s
+2026-09-22T19:12:36 PULSE attrib/rd C:\Windows.old\WINDOWS running for 20s
+2026-09-22T19:12:41 PULSE attrib/rd C:\Windows.old\WINDOWS running for 25s
+2026-09-22T19:12:46 PULSE attrib/rd C:\Windows.old\WINDOWS running for 30s
+2026-09-22T19:12:51 PULSE attrib/rd C:\Windows.old\WINDOWS running for 35s
+2026-09-22T19:12:56 PULSE attrib/rd C:\Windows.old\WINDOWS running for 40s
+2026-09-22T19:13:01 PULSE attrib/rd C:\Windows.old\WINDOWS running for 45s
+2026-09-22T19:13:06 PULSE attrib/rd C:\Windows.old\WINDOWS running for 50s
+2026-09-22T19:13:11 PULSE attrib/rd C:\Windows.old\WINDOWS running for 55s
+2026-09-22T19:13:16 PULSE attrib/rd C:\Windows.old\WINDOWS running for 60s
+2026-09-22T19:13:21 PULSE attrib/rd C:\Windows.old\WINDOWS running for 65s
+2026-09-22T19:13:26 PULSE attrib/rd C:\Windows.old\WINDOWS running for 70s
+2026-09-22T19:13:31 PULSE attrib/rd C:\Windows.old\WINDOWS running for 75s
+2026-09-22T19:13:36 PULSE attrib/rd C:\Windows.old\WINDOWS running for 80s
+2026-09-22T19:13:37 EXIT attrib/rd C:\Windows.old\WINDOWS code=0
+2026-09-22T19:13:42 PULSE root rd C:\Windows.old running for 5s
+2026-09-22T19:13:47 PULSE root rd C:\Windows.old running for 10s
+2026-09-22T19:13:52 PULSE root rd C:\Windows.old running for 15s
+2026-09-22T19:13:57 PULSE root rd C:\Windows.old running for 20s
+2026-09-22T19:14:02 PULSE root rd C:\Windows.old running for 25s
+2026-09-22T19:14:07 PULSE root rd C:\Windows.old running for 30s
+2026-09-22T19:14:07 TIMEOUT root rd C:\Windows.old after 30s
+2026-09-22T19:14:09 ITERATION 1 entries=4
+2026-09-22T19:14:09 PASS robocopy/mirror begin C:\Windows.old\Program Files
+2026-09-22T19:14:10 EXIT robocopy C:\Windows.old\Program Files code=0
+2026-09-22T19:14:10 PASS robocopy/mirror exit C:\Windows.old\Program Files code=0
+2026-09-22T19:14:10 PASS rd begin C:\Windows.old\Program Files
+2026-09-22T19:14:11 EXIT rd C:\Windows.old\Program Files code=0
+2026-09-22T19:14:11 PASS attrib/rd begin C:\Windows.old\Program Files
+2026-09-22T19:14:12 EXIT attrib/rd C:\Windows.old\Program Files code=0
+2026-09-22T19:14:12 PASS robocopy/mirror begin C:\Windows.old\Program Files (x86)
+2026-09-22T19:14:13 EXIT robocopy C:\Windows.old\Program Files (x86) code=0
+2026-09-22T19:14:13 PASS robocopy/mirror exit C:\Windows.old\Program Files (x86) code=0
+2026-09-22T19:14:13 PASS rd begin C:\Windows.old\Program Files (x86)
+2026-09-22T19:14:14 EXIT rd C:\Windows.old\Program Files (x86) code=0
+2026-09-22T19:14:14 PASS attrib/rd begin C:\Windows.old\Program Files (x86)
+2026-09-22T19:14:16 EXIT attrib/rd C:\Windows.old\Program Files (x86) code=0
+2026-09-22T19:14:16 PASS robocopy/mirror begin C:\Windows.old\ProgramData
+2026-09-22T19:14:21 PULSE robocopy C:\Windows.old\ProgramData running for 5s
+2026-09-22T19:14:26 PULSE robocopy C:\Windows.old\ProgramData running for 10s
+2026-09-22T19:14:31 PULSE robocopy C:\Windows.old\ProgramData running for 15s
+2026-09-22T19:14:36 PULSE robocopy C:\Windows.old\ProgramData running for 20s
+2026-09-22T19:14:41 PULSE robocopy C:\Windows.old\ProgramData running for 25s
+2026-09-22T19:14:46 PULSE robocopy C:\Windows.old\ProgramData running for 30s
+2026-09-22T19:14:51 PULSE robocopy C:\Windows.old\ProgramData running for 35s
+2026-09-22T19:14:56 PULSE robocopy C:\Windows.old\ProgramData running for 40s
+2026-09-22T19:15:01 PULSE robocopy C:\Windows.old\ProgramData running for 45s
+2026-09-22T19:15:06 PULSE robocopy C:\Windows.old\ProgramData running for 50s
+2026-09-22T19:15:11 PULSE robocopy C:\Windows.old\ProgramData running for 55s
+2026-09-22T19:15:16 PULSE robocopy C:\Windows.old\ProgramData running for 60s
+2026-09-22T19:15:21 PULSE robocopy C:\Windows.old\ProgramData running for 65s
+2026-09-22T19:15:26 PULSE robocopy C:\Windows.old\ProgramData running for 70s
+2026-09-22T19:15:31 PULSE robocopy C:\Windows.old\ProgramData running for 75s
+2026-09-22T19:15:36 PULSE robocopy C:\Windows.old\ProgramData running for 80s
+2026-09-22T19:15:41 PULSE robocopy C:\Windows.old\ProgramData running for 85s
+2026-09-22T19:15:46 PULSE robocopy C:\Windows.old\ProgramData running for 90s
+2026-09-22T19:15:51 PULSE robocopy C:\Windows.old\ProgramData running for 95s
+2026-09-22T19:15:56 PULSE robocopy C:\Windows.old\ProgramData running for 100s
+2026-09-22T19:16:01 PULSE robocopy C:\Windows.old\ProgramData running for 105s
+2026-09-22T19:16:06 PULSE robocopy C:\Windows.old\ProgramData running for 110s
+2026-09-22T19:16:11 PULSE robocopy C:\Windows.old\ProgramData running for 115s
+2026-09-22T19:16:16 PULSE robocopy C:\Windows.old\ProgramData running for 120s
+2026-09-22T19:16:21 PULSE robocopy C:\Windows.old\ProgramData running for 125s
+2026-09-22T19:16:26 PULSE robocopy C:\Windows.old\ProgramData running for 130s
+2026-09-22T19:16:31 PULSE robocopy C:\Windows.old\ProgramData running for 135s
+2026-09-22T19:16:36 PULSE robocopy C:\Windows.old\ProgramData running for 141s
+2026-09-22T19:16:41 PULSE robocopy C:\Windows.old\ProgramData running for 146s
+2026-09-22T19:16:46 PULSE robocopy C:\Windows.old\ProgramData running for 151s
+2026-09-22T19:16:51 PULSE robocopy C:\Windows.old\ProgramData running for 156s
+2026-09-22T19:16:56 PULSE robocopy C:\Windows.old\ProgramData running for 161s
+2026-09-22T19:17:01 PULSE robocopy C:\Windows.old\ProgramData running for 166s
+2026-09-22T19:17:06 PULSE robocopy C:\Windows.old\ProgramData running for 171s
+2026-09-22T19:17:11 PULSE robocopy C:\Windows.old\ProgramData running for 176s
+2026-09-22T19:17:16 PULSE robocopy C:\Windows.old\ProgramData running for 181s
+2026-09-22T19:17:16 TIMEOUT robocopy C:\Windows.old\ProgramData after 180s
+2026-09-22T19:17:16 PASS robocopy/mirror exit C:\Windows.old\ProgramData code=124
+2026-09-22T19:17:16 PASS rd begin C:\Windows.old\ProgramData
+2026-09-22T19:17:21 PULSE rd C:\Windows.old\ProgramData running for 5s
+2026-09-22T19:17:26 PULSE rd C:\Windows.old\ProgramData running for 10s
+2026-09-22T19:17:31 PULSE rd C:\Windows.old\ProgramData running for 15s
+2026-09-22T19:17:36 PULSE rd C:\Windows.old\ProgramData running for 20s
+2026-09-22T19:17:41 PULSE rd C:\Windows.old\ProgramData running for 25s
+2026-09-22T19:17:46 PULSE rd C:\Windows.old\ProgramData running for 30s
+2026-09-22T19:17:51 PULSE rd C:\Windows.old\ProgramData running for 35s
+2026-09-22T19:17:56 PULSE rd C:\Windows.old\ProgramData running for 40s
+2026-09-22T19:18:01 PULSE rd C:\Windows.old\ProgramData running for 45s
+2026-09-22T19:18:06 PULSE rd C:\Windows.old\ProgramData running for 50s
+2026-09-22T19:18:11 PULSE rd C:\Windows.old\ProgramData running for 55s
+2026-09-22T19:18:16 PULSE rd C:\Windows.old\ProgramData running for 60s
+2026-09-22T19:18:22 PULSE rd C:\Windows.old\ProgramData running for 65s
+2026-09-22T19:18:27 PULSE rd C:\Windows.old\ProgramData running for 70s
+2026-09-22T19:18:32 PULSE rd C:\Windows.old\ProgramData running for 75s
+2026-09-22T19:18:37 PULSE rd C:\Windows.old\ProgramData running for 80s
+2026-09-22T19:18:42 PULSE rd C:\Windows.old\ProgramData running for 85s
+2026-09-22T19:18:47 PULSE rd C:\Windows.old\ProgramData running for 90s
+2026-09-22T19:18:47 TIMEOUT rd C:\Windows.old\ProgramData after 90s
+2026-09-22T19:18:47 PASS attrib/rd begin C:\Windows.old\ProgramData
+2026-09-22T19:18:52 PULSE attrib/rd C:\Windows.old\ProgramData running for 5s
+2026-09-22T19:18:57 PULSE attrib/rd C:\Windows.old\ProgramData running for 10s
+2026-09-22T19:19:02 PULSE attrib/rd C:\Windows.old\ProgramData running for 15s
+2026-09-22T19:19:07 PULSE attrib/rd C:\Windows.old\ProgramData running for 20s
+2026-09-22T19:19:12 PULSE attrib/rd C:\Windows.old\ProgramData running for 25s
+2026-09-22T19:19:17 PULSE attrib/rd C:\Windows.old\ProgramData running for 30s
+2026-09-22T19:19:22 PULSE attrib/rd C:\Windows.old\ProgramData running for 35s
+2026-09-22T19:19:27 PULSE attrib/rd C:\Windows.old\ProgramData running for 40s
+2026-09-22T19:19:32 PULSE attrib/rd C:\Windows.old\ProgramData running for 45s
+2026-09-22T19:19:37 PULSE attrib/rd C:\Windows.old\ProgramData running for 50s
+2026-09-22T19:19:42 PULSE attrib/rd C:\Windows.old\ProgramData running for 55s
+2026-09-22T19:19:47 PULSE attrib/rd C:\Windows.old\ProgramData running for 60s
+2026-09-22T19:19:47 EXIT attrib/rd C:\Windows.old\ProgramData code=0
+2026-09-22T19:19:47 PASS robocopy/mirror begin C:\Windows.old\WINDOWS
+2026-09-22T19:19:52 PULSE robocopy C:\Windows.old\WINDOWS running for 5s
+2026-09-22T19:19:57 PULSE robocopy C:\Windows.old\WINDOWS running for 10s
+2026-09-22T19:20:02 PULSE robocopy C:\Windows.old\WINDOWS running for 15s
+2026-09-22T19:20:07 PULSE robocopy C:\Windows.old\WINDOWS running for 20s
+2026-09-22T19:20:12 PULSE robocopy C:\Windows.old\WINDOWS running for 25s
+2026-09-22T19:20:17 PULSE robocopy C:\Windows.old\WINDOWS running for 30s
+2026-09-22T19:20:22 PULSE robocopy C:\Windows.old\WINDOWS running for 35s
+2026-09-22T19:20:27 PULSE robocopy C:\Windows.old\WINDOWS running for 40s
+2026-09-22T19:20:32 PULSE robocopy C:\Windows.old\WINDOWS running for 45s
+2026-09-22T19:20:37 PULSE robocopy C:\Windows.old\WINDOWS running for 50s
+2026-09-22T19:20:42 PULSE robocopy C:\Windows.old\WINDOWS running for 55s
+2026-09-22T19:20:47 PULSE robocopy C:\Windows.old\WINDOWS running for 60s
+2026-09-22T19:20:52 PULSE robocopy C:\Windows.old\WINDOWS running for 65s
+2026-09-22T19:20:57 PULSE robocopy C:\Windows.old\WINDOWS running for 70s
+2026-09-22T19:21:02 PULSE robocopy C:\Windows.old\WINDOWS running for 75s
+2026-09-22T19:21:07 PULSE robocopy C:\Windows.old\WINDOWS running for 80s
+2026-09-22T19:21:12 PULSE robocopy C:\Windows.old\WINDOWS running for 85s
+2026-09-22T19:21:17 PULSE robocopy C:\Windows.old\WINDOWS running for 90s
+2026-09-22T19:21:19 EXIT robocopy C:\Windows.old\WINDOWS code=2
+2026-09-22T19:21:19 PASS robocopy/mirror exit C:\Windows.old\WINDOWS code=2
+2026-09-22T19:21:19 PASS rd begin C:\Windows.old\WINDOWS
+2026-09-22T19:21:20 EXIT rd C:\Windows.old\WINDOWS code=0
+2026-09-22T19:21:25 PULSE root rd C:\Windows.old running for 5s
+2026-09-22T19:21:30 PULSE root rd C:\Windows.old running for 10s
+2026-09-22T19:21:35 PULSE root rd C:\Windows.old running for 15s
+2026-09-22T19:21:41 PULSE root rd C:\Windows.old running for 20s
+2026-09-22T19:21:46 PULSE root rd C:\Windows.old running for 25s
+2026-09-22T19:21:51 PULSE root rd C:\Windows.old running for 30s
+2026-09-22T19:21:51 TIMEOUT root rd C:\Windows.old after 30s
+2026-09-22T19:21:53 ITERATION 2 entries=3
+2026-09-22T19:21:53 PASS robocopy/mirror begin C:\Windows.old\Program Files
+2026-09-22T19:21:54 EXIT robocopy C:\Windows.old\Program Files code=0
+2026-09-22T19:21:54 PASS robocopy/mirror exit C:\Windows.old\Program Files code=0
+2026-09-22T19:21:54 PASS rd begin C:\Windows.old\Program Files
+2026-09-22T19:21:55 EXIT rd C:\Windows.old\Program Files code=0
+2026-09-22T19:21:55 PASS attrib/rd begin C:\Windows.old\Program Files
+2026-09-22T19:21:56 EXIT attrib/rd C:\Windows.old\Program Files code=0
+2026-09-22T19:21:56 PASS robocopy/mirror begin C:\Windows.old\Program Files (x86)
+2026-09-22T19:21:57 EXIT robocopy C:\Windows.old\Program Files (x86) code=0
+2026-09-22T19:21:57 PASS robocopy/mirror exit C:\Windows.old\Program Files (x86) code=0
+2026-09-22T19:21:57 PASS rd begin C:\Windows.old\Program Files (x86)
+2026-09-22T19:21:58 EXIT rd C:\Windows.old\Program Files (x86) code=0
+2026-09-22T19:21:58 PASS attrib/rd begin C:\Windows.old\Program Files (x86)
+2026-09-22T19:21:59 EXIT attrib/rd C:\Windows.old\Program Files (x86) code=0
+2026-09-22T19:21:59 PASS robocopy/mirror begin C:\Windows.old\ProgramData
+2026-09-22T19:22:04 PULSE robocopy C:\Windows.old\ProgramData running for 5s
+2026-09-22T19:22:09 PULSE robocopy C:\Windows.old\ProgramData running for 10s
+2026-09-22T19:22:14 PULSE robocopy C:\Windows.old\ProgramData running for 15s
+2026-09-22T19:22:19 PULSE robocopy C:\Windows.old\ProgramData running for 20s
+2026-09-22T19:22:24 PULSE robocopy C:\Windows.old\ProgramData running for 25s
+2026-09-22T19:22:29 PULSE robocopy C:\Windows.old\ProgramData running for 30s
+2026-09-22T19:22:34 PULSE robocopy C:\Windows.old\ProgramData running for 35s
+2026-09-22T19:22:39 PULSE robocopy C:\Windows.old\ProgramData running for 40s
+2026-09-22T19:22:44 PULSE robocopy C:\Windows.old\ProgramData running for 45s
+2026-09-22T19:22:49 PULSE robocopy C:\Windows.old\ProgramData running for 50s
+2026-09-22T19:22:54 PULSE robocopy C:\Windows.old\ProgramData running for 55s
+2026-09-22T19:22:59 PULSE robocopy C:\Windows.old\ProgramData running for 60s
+2026-09-22T19:23:04 PULSE robocopy C:\Windows.old\ProgramData running for 65s
+2026-09-22T19:23:09 PULSE robocopy C:\Windows.old\ProgramData running for 70s
+2026-09-22T19:23:14 PULSE robocopy C:\Windows.old\ProgramData running for 75s
+2026-09-22T19:23:19 PULSE robocopy C:\Windows.old\ProgramData running for 80s
+2026-09-22T19:23:24 PULSE robocopy C:\Windows.old\ProgramData running for 85s
+2026-09-22T19:23:29 PULSE robocopy C:\Windows.old\ProgramData running for 90s
+2026-09-22T19:23:34 PULSE robocopy C:\Windows.old\ProgramData running for 95s
+2026-09-22T19:23:39 PULSE robocopy C:\Windows.old\ProgramData running for 100s
+2026-09-22T19:23:44 PULSE robocopy C:\Windows.old\ProgramData running for 105s
+2026-09-22T19:23:49 PULSE robocopy C:\Windows.old\ProgramData running for 110s
+2026-09-22T19:23:54 PULSE robocopy C:\Windows.old\ProgramData running for 116s
+2026-09-22T19:23:59 PULSE robocopy C:\Windows.old\ProgramData running for 121s
+2026-09-22T19:24:04 PULSE robocopy C:\Windows.old\ProgramData running for 126s
+2026-09-22T19:24:09 PULSE robocopy C:\Windows.old\ProgramData running for 131s
+2026-09-22T19:24:14 PULSE robocopy C:\Windows.old\ProgramData running for 136s
+2026-09-22T19:24:19 PULSE robocopy C:\Windows.old\ProgramData running for 141s
+2026-09-22T19:24:24 PULSE robocopy C:\Windows.old\ProgramData running for 146s
+2026-09-22T19:24:29 PULSE robocopy C:\Windows.old\ProgramData running for 151s
+2026-09-22T19:24:34 PULSE robocopy C:\Windows.old\ProgramData running for 156s
+2026-09-22T19:24:39 PULSE robocopy C:\Windows.old\ProgramData running for 161s
+2026-09-22T19:24:44 PULSE robocopy C:\Windows.old\ProgramData running for 166s
+2026-09-22T19:24:49 PULSE robocopy C:\Windows.old\ProgramData running for 171s
+2026-09-22T19:24:55 PULSE robocopy C:\Windows.old\ProgramData running for 176s
+2026-09-22T19:25:00 PULSE robocopy C:\Windows.old\ProgramData running for 181s
+2026-09-22T19:25:00 TIMEOUT robocopy C:\Windows.old\ProgramData after 180s
+2026-09-22T19:25:00 PASS robocopy/mirror exit C:\Windows.old\ProgramData code=124
+2026-09-22T19:25:00 PASS rd begin C:\Windows.old\ProgramData
+2026-09-22T19:25:05 PULSE rd C:\Windows.old\ProgramData running for 5s
+2026-09-22T19:25:10 PULSE rd C:\Windows.old\ProgramData running for 10s
+2026-09-22T19:25:15 PULSE rd C:\Windows.old\ProgramData running for 15s
+2026-09-22T19:25:20 PULSE rd C:\Windows.old\ProgramData running for 20s
+2026-09-22T19:25:25 PULSE rd C:\Windows.old\ProgramData running for 25s
+2026-09-22T19:25:30 PULSE rd C:\Windows.old\ProgramData running for 30s
+2026-09-22T19:25:35 PULSE rd C:\Windows.old\ProgramData running for 35s
+2026-09-22T19:25:40 PULSE rd C:\Windows.old\ProgramData running for 40s
+2026-09-22T19:25:45 PULSE rd C:\Windows.old\ProgramData running for 45s
+2026-09-22T19:25:50 PULSE rd C:\Windows.old\ProgramData running for 50s
+2026-09-22T19:25:55 PULSE rd C:\Windows.old\ProgramData running for 55s
+2026-09-22T19:26:00 PULSE rd C:\Windows.old\ProgramData running for 60s
+2026-09-22T19:26:05 PULSE rd C:\Windows.old\ProgramData running for 65s
+2026-09-22T19:26:10 PULSE rd C:\Windows.old\ProgramData running for 70s
+2026-09-22T19:26:15 PULSE rd C:\Windows.old\ProgramData running for 75s
+2026-09-22T19:26:19 EXIT rd C:\Windows.old\ProgramData code=0
+2026-09-22T19:26:19 PASS attrib/rd begin C:\Windows.old\ProgramData
+2026-09-22T19:26:24 PULSE attrib/rd C:\Windows.old\ProgramData running for 5s
+2026-09-22T19:26:29 PULSE attrib/rd C:\Windows.old\ProgramData running for 10s
+2026-09-22T19:26:34 PULSE attrib/rd C:\Windows.old\ProgramData running for 15s
+2026-09-22T19:26:39 PULSE attrib/rd C:\Windows.old\ProgramData running for 20s
+2026-09-22T19:26:44 PULSE attrib/rd C:\Windows.old\ProgramData running for 25s
+2026-09-22T19:26:49 PULSE attrib/rd C:\Windows.old\ProgramData running for 30s
+2026-09-22T19:26:54 PULSE attrib/rd C:\Windows.old\ProgramData running for 35s
+2026-09-22T19:26:59 PULSE attrib/rd C:\Windows.old\ProgramData running for 40s
+2026-09-22T19:27:04 PULSE attrib/rd C:\Windows.old\ProgramData running for 45s
+2026-09-22T19:27:09 PULSE attrib/rd C:\Windows.old\ProgramData running for 50s
+2026-09-22T19:27:13 EXIT attrib/rd C:\Windows.old\ProgramData code=0
+2026-09-22T19:27:18 PULSE root rd C:\Windows.old running for 5s
+2026-09-22T19:27:23 PULSE root rd C:\Windows.old running for 10s
+2026-09-22T19:27:28 PULSE root rd C:\Windows.old running for 15s
+2026-09-22T19:27:33 PULSE root rd C:\Windows.old running for 20s
+2026-09-22T19:27:38 PULSE root rd C:\Windows.old running for 25s
+2026-09-22T19:27:43 PULSE root rd C:\Windows.old running for 30s
+2026-09-22T19:27:43 TIMEOUT root rd C:\Windows.old after 30s
+2026-09-22T19:27:45 ITERATION 3 entries=3
+2026-09-22T19:27:45 PASS robocopy/mirror begin C:\Windows.old\Program Files
+2026-09-22T19:27:46 EXIT robocopy C:\Windows.old\Program Files code=0
+2026-09-22T19:27:46 PASS robocopy/mirror exit C:\Windows.old\Program Files code=0
+2026-09-22T19:27:46 PASS rd begin C:\Windows.old\Program Files
+2026-09-22T19:27:47 EXIT rd C:\Windows.old\Program Files code=0
+2026-09-22T19:27:47 PASS attrib/rd begin C:\Windows.old\Program Files
+2026-09-22T19:27:48 EXIT attrib/rd C:\Windows.old\Program Files code=0
+2026-09-22T19:27:48 PASS robocopy/mirror begin C:\Windows.old\Program Files (x86)
+2026-09-22T19:27:49 EXIT robocopy C:\Windows.old\Program Files (x86) code=0
+2026-09-22T19:27:49 PASS robocopy/mirror exit C:\Windows.old\Program Files (x86) code=0
+2026-09-22T19:27:49 PASS rd begin C:\Windows.old\Program Files (x86)
+2026-09-22T19:27:50 EXIT rd C:\Windows.old\Program Files (x86) code=0
+2026-09-22T19:27:50 PASS attrib/rd begin C:\Windows.old\Program Files (x86)
+2026-09-22T19:27:51 EXIT attrib/rd C:\Windows.old\Program Files (x86) code=0
+2026-09-22T19:27:51 PASS robocopy/mirror begin C:\Windows.old\ProgramData
+2026-09-22T19:27:56 PULSE robocopy C:\Windows.old\ProgramData running for 5s
+2026-09-22T19:28:01 PULSE robocopy C:\Windows.old\ProgramData running for 10s
+2026-09-22T19:28:06 PULSE robocopy C:\Windows.old\ProgramData running for 15s
+2026-09-22T19:28:11 PULSE robocopy C:\Windows.old\ProgramData running for 20s
+2026-09-22T19:28:16 PULSE robocopy C:\Windows.old\ProgramData running for 25s
+2026-09-22T19:28:21 PULSE robocopy C:\Windows.old\ProgramData running for 30s
+2026-09-22T19:28:26 PULSE robocopy C:\Windows.old\ProgramData running for 35s
+2026-09-22T19:28:31 PULSE robocopy C:\Windows.old\ProgramData running for 40s
+2026-09-22T19:28:37 PULSE robocopy C:\Windows.old\ProgramData running for 45s
+2026-09-22T19:28:42 PULSE robocopy C:\Windows.old\ProgramData running for 50s
+2026-09-22T19:28:47 PULSE robocopy C:\Windows.old\ProgramData running for 55s
+2026-09-22T19:28:52 PULSE robocopy C:\Windows.old\ProgramData running for 60s
+2026-09-22T19:28:57 PULSE robocopy C:\Windows.old\ProgramData running for 65s
+2026-09-22T19:29:02 PULSE robocopy C:\Windows.old\ProgramData running for 70s
+2026-09-22T19:29:07 PULSE robocopy C:\Windows.old\ProgramData running for 75s
+2026-09-22T19:29:12 PULSE robocopy C:\Windows.old\ProgramData running for 80s
+2026-09-22T19:29:17 PULSE robocopy C:\Windows.old\ProgramData running for 85s
+2026-09-22T19:29:22 PULSE robocopy C:\Windows.old\ProgramData running for 90s
+2026-09-22T19:29:27 PULSE robocopy C:\Windows.old\ProgramData running for 95s
+2026-09-22T19:29:32 PULSE robocopy C:\Windows.old\ProgramData running for 100s
+2026-09-22T19:29:37 PULSE robocopy C:\Windows.old\ProgramData running for 105s
+2026-09-22T19:29:42 PULSE robocopy C:\Windows.old\ProgramData running for 110s
+2026-09-22T19:29:47 PULSE robocopy C:\Windows.old\ProgramData running for 115s
+2026-09-22T19:29:52 PULSE robocopy C:\Windows.old\ProgramData running for 120s
+2026-09-22T19:29:57 PULSE robocopy C:\Windows.old\ProgramData running for 125s
+2026-09-22T19:30:02 PULSE robocopy C:\Windows.old\ProgramData running for 131s
+2026-09-22T19:30:07 PULSE robocopy C:\Windows.old\ProgramData running for 136s
+2026-09-22T19:30:12 PULSE robocopy C:\Windows.old\ProgramData running for 141s
+2026-09-22T19:30:17 PULSE robocopy C:\Windows.old\ProgramData running for 146s
+2026-09-22T19:30:22 PULSE robocopy C:\Windows.old\ProgramData running for 151s
+2026-09-22T19:30:27 PULSE robocopy C:\Windows.old\ProgramData running for 156s
+2026-09-22T19:30:32 PULSE robocopy C:\Windows.old\ProgramData running for 161s
+2026-09-22T19:30:37 PULSE robocopy C:\Windows.old\ProgramData running for 166s
+2026-09-22T19:30:42 PULSE robocopy C:\Windows.old\ProgramData running for 171s
+2026-09-22T19:30:47 PULSE robocopy C:\Windows.old\ProgramData running for 176s
+2026-09-22T19:30:52 PULSE robocopy C:\Windows.old\ProgramData running for 181s
+2026-09-22T19:30:52 TIMEOUT robocopy C:\Windows.old\ProgramData after 180s
+2026-09-22T19:30:52 PASS robocopy/mirror exit C:\Windows.old\ProgramData code=124
+2026-09-22T19:30:52 PASS rd begin C:\Windows.old\ProgramData
+2026-09-22T19:30:57 PULSE rd C:\Windows.old\ProgramData running for 5s
+2026-09-22T19:31:02 PULSE rd C:\Windows.old\ProgramData running for 10s
+2026-09-22T19:31:07 PULSE rd C:\Windows.old\ProgramData running for 15s
+2026-09-22T19:31:12 PULSE rd C:\Windows.old\ProgramData running for 20s
+2026-09-22T19:31:17 PULSE rd C:\Windows.old\ProgramData running for 25s
+2026-09-22T19:31:22 PULSE rd C:\Windows.old\ProgramData running for 30s
+2026-09-22T19:31:27 PULSE rd C:\Windows.old\ProgramData running for 35s
+2026-09-22T19:31:32 PULSE rd C:\Windows.old\ProgramData running for 40s
+2026-09-22T19:31:37 PULSE rd C:\Windows.old\ProgramData running for 45s
+2026-09-22T19:31:42 PULSE rd C:\Windows.old\ProgramData running for 50s
+2026-09-22T19:31:47 PULSE rd C:\Windows.old\ProgramData running for 55s
+2026-09-22T19:31:50 EXIT rd C:\Windows.old\ProgramData code=0
+2026-09-22T19:31:50 PASS attrib/rd begin C:\Windows.old\ProgramData
+2026-09-22T19:31:55 PULSE attrib/rd C:\Windows.old\ProgramData running for 5s
+2026-09-22T19:32:01 PULSE attrib/rd C:\Windows.old\ProgramData running for 10s
+2026-09-22T19:32:06 PULSE attrib/rd C:\Windows.old\ProgramData running for 15s
+2026-09-22T19:32:11 PULSE attrib/rd C:\Windows.old\ProgramData running for 20s
+2026-09-22T19:32:16 PULSE attrib/rd C:\Windows.old\ProgramData running for 25s
+2026-09-22T19:32:21 PULSE attrib/rd C:\Windows.old\ProgramData running for 30s
+2026-09-22T19:32:26 PULSE attrib/rd C:\Windows.old\ProgramData running for 35s
+2026-09-22T19:32:31 PULSE attrib/rd C:\Windows.old\ProgramData running for 40s
+2026-09-22T19:32:34 EXIT attrib/rd C:\Windows.old\ProgramData code=0
+2026-09-22T19:32:39 PULSE root rd C:\Windows.old running for 5s
+2026-09-22T19:32:44 PULSE root rd C:\Windows.old running for 10s
+2026-09-22T19:32:49 PULSE root rd C:\Windows.old running for 15s
+2026-09-22T19:32:54 PULSE root rd C:\Windows.old running for 20s
+2026-09-22T19:32:59 PULSE root rd C:\Windows.old running for 25s
+2026-09-22T19:33:04 PULSE root rd C:\Windows.old running for 30s
+2026-09-22T19:33:04 TIMEOUT root rd C:\Windows.old after 30s
+2026-09-22T19:33:06 ITERATION 4 entries=3
+2026-09-22T19:33:06 PASS robocopy/mirror begin C:\Windows.old\Program Files
+2026-09-22T19:33:07 EXIT robocopy C:\Windows.old\Program Files code=0
+2026-09-22T19:33:07 PASS robocopy/mirror exit C:\Windows.old\Program Files code=0
+2026-09-22T19:33:07 PASS rd begin C:\Windows.old\Program Files
+2026-09-22T19:33:08 EXIT rd C:\Windows.old\Program Files code=0
+2026-09-22T19:33:08 PASS attrib/rd begin C:\Windows.old\Program Files
+2026-09-22T19:33:09 EXIT attrib/rd C:\Windows.old\Program Files code=0
+2026-09-22T19:33:09 PASS robocopy/mirror begin C:\Windows.old\Program Files (x86)
+2026-09-22T19:33:10 EXIT robocopy C:\Windows.old\Program Files (x86) code=0
+2026-09-22T19:33:10 PASS robocopy/mirror exit C:\Windows.old\Program Files (x86) code=0
+2026-09-22T19:33:10 PASS rd begin C:\Windows.old\Program Files (x86)
+2026-09-22T19:33:11 EXIT rd C:\Windows.old\Program Files (x86) code=0
+2026-09-22T19:33:11 PASS attrib/rd begin C:\Windows.old\Program Files (x86)
+2026-09-22T19:33:12 EXIT attrib/rd C:\Windows.old\Program Files (x86) code=0
+2026-09-22T19:33:12 PASS robocopy/mirror begin C:\Windows.old\ProgramData
+2026-09-22T19:33:17 PULSE robocopy C:\Windows.old\ProgramData running for 5s
+2026-09-22T19:33:22 PULSE robocopy C:\Windows.old\ProgramData running for 10s
+2026-09-22T19:33:27 PULSE robocopy C:\Windows.old\ProgramData running for 15s
+2026-09-22T19:33:32 PULSE robocopy C:\Windows.old\ProgramData running for 20s
+2026-09-22T19:33:37 PULSE robocopy C:\Windows.old\ProgramData running for 25s
+2026-09-22T19:33:42 PULSE robocopy C:\Windows.old\ProgramData running for 30s
+2026-09-22T19:33:47 PULSE robocopy C:\Windows.old\ProgramData running for 35s
+2026-09-22T19:33:52 PULSE robocopy C:\Windows.old\ProgramData running for 40s
+2026-09-22T19:33:57 PULSE robocopy C:\Windows.old\ProgramData running for 45s
+2026-09-22T19:34:02 PULSE robocopy C:\Windows.old\ProgramData running for 50s
+2026-09-22T19:34:07 PULSE robocopy C:\Windows.old\ProgramData running for 55s
+2026-09-22T19:34:12 PULSE robocopy C:\Windows.old\ProgramData running for 60s
+2026-09-22T19:34:17 PULSE robocopy C:\Windows.old\ProgramData running for 65s
+2026-09-22T19:34:22 PULSE robocopy C:\Windows.old\ProgramData running for 70s
+2026-09-22T19:34:27 PULSE robocopy C:\Windows.old\ProgramData running for 75s
+2026-09-22T19:34:32 PULSE robocopy C:\Windows.old\ProgramData running for 80s
+2026-09-22T19:34:37 PULSE robocopy C:\Windows.old\ProgramData running for 85s
+2026-09-22T19:34:42 PULSE robocopy C:\Windows.old\ProgramData running for 90s
+2026-09-22T19:34:47 PULSE robocopy C:\Windows.old\ProgramData running for 95s
+2026-09-22T19:34:52 PULSE robocopy C:\Windows.old\ProgramData running for 100s
+2026-09-22T19:34:57 PULSE robocopy C:\Windows.old\ProgramData running for 105s
+2026-09-22T19:35:02 PULSE robocopy C:\Windows.old\ProgramData running for 110s
+2026-09-22T19:35:07 PULSE robocopy C:\Windows.old\ProgramData running for 116s
+2026-09-22T19:35:12 PULSE robocopy C:\Windows.old\ProgramData running for 121s
+2026-09-22T19:35:17 PULSE robocopy C:\Windows.old\ProgramData running for 126s
+2026-09-22T19:35:22 PULSE robocopy C:\Windows.old\ProgramData running for 131s
+2026-09-22T19:35:27 PULSE robocopy C:\Windows.old\ProgramData running for 136s
+2026-09-22T19:35:33 PULSE robocopy C:\Windows.old\ProgramData running for 141s
+2026-09-22T19:35:38 PULSE robocopy C:\Windows.old\ProgramData running for 146s
+2026-09-22T19:35:43 PULSE robocopy C:\Windows.old\ProgramData running for 151s
+2026-09-22T19:35:48 PULSE robocopy C:\Windows.old\ProgramData running for 156s
+2026-09-22T19:35:53 PULSE robocopy C:\Windows.old\ProgramData running for 161s
+2026-09-22T19:35:58 PULSE robocopy C:\Windows.old\ProgramData running for 166s
+2026-09-22T19:36:03 PULSE robocopy C:\Windows.old\ProgramData running for 171s
+2026-09-22T19:36:08 PULSE robocopy C:\Windows.old\ProgramData running for 176s
+2026-09-22T19:36:13 PULSE robocopy C:\Windows.old\ProgramData running for 181s
+2026-09-22T19:36:13 TIMEOUT robocopy C:\Windows.old\ProgramData after 180s
+2026-09-22T19:36:13 PASS robocopy/mirror exit C:\Windows.old\ProgramData code=124
+2026-09-22T19:36:13 PASS rd begin C:\Windows.old\ProgramData
+2026-09-22T19:36:18 PULSE rd C:\Windows.old\ProgramData running for 5s
+2026-09-22T19:36:23 PULSE rd C:\Windows.old\ProgramData running for 10s
+2026-09-22T19:36:28 PULSE rd C:\Windows.old\ProgramData running for 15s
+2026-09-22T19:36:30 EXIT rd C:\Windows.old\ProgramData code=0
+2026-09-22T19:36:30 PASS attrib/rd begin C:\Windows.old\ProgramData
+2026-09-22T19:36:35 PULSE attrib/rd C:\Windows.old\ProgramData running for 5s
+2026-09-22T19:36:40 PULSE attrib/rd C:\Windows.old\ProgramData running for 10s
+2026-09-22T19:36:41 EXIT attrib/rd C:\Windows.old\ProgramData code=0
+2026-09-22T19:36:46 PULSE root rd C:\Windows.old running for 5s
+2026-09-22T19:36:49 EXIT root rd C:\Windows.old code=0
+2026-09-22T19:36:51 ITERATION 5 entries=3
+2026-09-22T19:36:51 PASS robocopy/mirror begin C:\Windows.old\Program Files
+2026-09-22T19:36:52 EXIT robocopy C:\Windows.old\Program Files code=0
+2026-09-22T19:36:52 PASS robocopy/mirror exit C:\Windows.old\Program Files code=0
+2026-09-22T19:36:52 PASS rd begin C:\Windows.old\Program Files
+2026-09-22T19:36:53 EXIT rd C:\Windows.old\Program Files code=0
+2026-09-22T19:36:53 PASS attrib/rd begin C:\Windows.old\Program Files
+2026-09-22T19:36:54 EXIT attrib/rd C:\Windows.old\Program Files code=0
+2026-09-22T19:36:54 PASS robocopy/mirror begin C:\Windows.old\Program Files (x86)
+2026-09-22T19:36:55 EXIT robocopy C:\Windows.old\Program Files (x86) code=0
+2026-09-22T19:36:55 PASS robocopy/mirror exit C:\Windows.old\Program Files (x86) code=0
+2026-09-22T19:36:55 PASS rd begin C:\Windows.old\Program Files (x86)
+2026-09-22T19:36:56 EXIT rd C:\Windows.old\Program Files (x86) code=0
+2026-09-22T19:36:56 PASS attrib/rd begin C:\Windows.old\Program Files (x86)
+2026-09-22T19:36:57 EXIT attrib/rd C:\Windows.old\Program Files (x86) code=0
+2026-09-22T19:36:57 PASS robocopy/mirror begin C:\Windows.old\ProgramData
+2026-09-22T19:37:02 PULSE robocopy C:\Windows.old\ProgramData running for 5s
+2026-09-22T19:37:07 PULSE robocopy C:\Windows.old\ProgramData running for 10s
+2026-09-22T19:37:12 PULSE robocopy C:\Windows.old\ProgramData running for 15s
+2026-09-22T19:37:17 PULSE robocopy C:\Windows.old\ProgramData running for 20s
+2026-09-22T19:37:22 PULSE robocopy C:\Windows.old\ProgramData running for 25s
+2026-09-22T19:37:27 PULSE robocopy C:\Windows.old\ProgramData running for 30s
+2026-09-22T19:37:32 PULSE robocopy C:\Windows.old\ProgramData running for 35s
+2026-09-22T19:37:37 PULSE robocopy C:\Windows.old\ProgramData running for 40s
+2026-09-22T19:37:42 PULSE robocopy C:\Windows.old\ProgramData running for 45s
+2026-09-22T19:37:47 PULSE robocopy C:\Windows.old\ProgramData running for 50s
+2026-09-22T19:37:52 PULSE robocopy C:\Windows.old\ProgramData running for 55s
+2026-09-22T19:37:57 PULSE robocopy C:\Windows.old\ProgramData running for 60s
+2026-09-22T19:38:02 PULSE robocopy C:\Windows.old\ProgramData running for 65s
+2026-09-22T19:38:07 PULSE robocopy C:\Windows.old\ProgramData running for 70s
+2026-09-22T19:38:12 PULSE robocopy C:\Windows.old\ProgramData running for 75s
+2026-09-22T19:38:17 PULSE robocopy C:\Windows.old\ProgramData running for 80s
+2026-09-22T19:38:22 PULSE robocopy C:\Windows.old\ProgramData running for 85s
+2026-09-22T19:38:27 PULSE robocopy C:\Windows.old\ProgramData running for 90s
+2026-09-22T19:38:32 PULSE robocopy C:\Windows.old\ProgramData running for 95s
+2026-09-22T19:38:37 PULSE robocopy C:\Windows.old\ProgramData running for 100s
+2026-09-22T19:38:42 PULSE robocopy C:\Windows.old\ProgramData running for 105s
+2026-09-22T19:38:47 PULSE robocopy C:\Windows.old\ProgramData running for 110s
+2026-09-22T19:38:52 PULSE robocopy C:\Windows.old\ProgramData running for 115s
+2026-09-22T19:38:57 PULSE robocopy C:\Windows.old\ProgramData running for 120s
+2026-09-22T19:39:02 PULSE robocopy C:\Windows.old\ProgramData running for 125s
+2026-09-22T19:39:07 PULSE robocopy C:\Windows.old\ProgramData running for 130s
+2026-09-22T19:39:12 PULSE robocopy C:\Windows.old\ProgramData running for 135s
+2026-09-22T19:39:17 PULSE robocopy C:\Windows.old\ProgramData running for 140s
+2026-09-22T19:39:22 PULSE robocopy C:\Windows.old\ProgramData running for 146s
+2026-09-22T19:39:27 PULSE robocopy C:\Windows.old\ProgramData running for 151s
+2026-09-22T19:39:32 PULSE robocopy C:\Windows.old\ProgramData running for 156s
+2026-09-22T19:39:37 PULSE robocopy C:\Windows.old\ProgramData running for 161s
+2026-09-22T19:39:42 PULSE robocopy C:\Windows.old\ProgramData running for 166s
+2026-09-22T19:39:47 PULSE robocopy C:\Windows.old\ProgramData running for 171s
+2026-09-22T19:39:52 PULSE robocopy C:\Windows.old\ProgramData running for 176s
+2026-09-22T19:39:52 EXIT robocopy C:\Windows.old\ProgramData code=2
+2026-09-22T19:39:52 PASS robocopy/mirror exit C:\Windows.old\ProgramData code=2
+2026-09-22T19:39:52 PASS rd begin C:\Windows.old\ProgramData
+2026-09-22T19:39:54 EXIT rd C:\Windows.old\ProgramData code=0
+2026-09-22T19:39:55 EXIT root rd C:\Windows.old code=0
+2026-09-22T19:39:57 ITERATION 6 entries=2
+2026-09-22T19:39:57 PASS robocopy/mirror begin C:\Windows.old\Program Files
+2026-09-22T19:39:58 EXIT robocopy C:\Windows.old\Program Files code=0
+2026-09-22T19:39:58 PASS robocopy/mirror exit C:\Windows.old\Program Files code=0
+2026-09-22T19:39:58 PASS rd begin C:\Windows.old\Program Files
+2026-09-22T19:39:59 EXIT rd C:\Windows.old\Program Files code=0
+2026-09-22T19:39:59 PASS attrib/rd begin C:\Windows.old\Program Files
+2026-09-22T19:40:00 EXIT attrib/rd C:\Windows.old\Program Files code=0
+2026-09-22T19:40:00 PASS robocopy/mirror begin C:\Windows.old\Program Files (x86)
+2026-09-22T19:40:01 EXIT robocopy C:\Windows.old\Program Files (x86) code=0
+2026-09-22T19:40:01 PASS robocopy/mirror exit C:\Windows.old\Program Files (x86) code=0
+2026-09-22T19:40:01 PASS rd begin C:\Windows.old\Program Files (x86)
+2026-09-22T19:40:02 EXIT rd C:\Windows.old\Program Files (x86) code=0
+2026-09-22T19:40:02 PASS attrib/rd begin C:\Windows.old\Program Files (x86)
+2026-09-22T19:40:03 EXIT attrib/rd C:\Windows.old\Program Files (x86) code=0
+2026-09-22T19:40:04 EXIT root rd C:\Windows.old code=0
+2026-09-22T19:40:06 ITERATION 7 entries=2
+2026-09-22T19:40:06 PASS robocopy/mirror begin C:\Windows.old\Program Files
+2026-09-22T19:40:07 EXIT robocopy C:\Windows.old\Program Files code=0
+2026-09-22T19:40:07 PASS robocopy/mirror exit C:\Windows.old\Program Files code=0
+2026-09-22T19:40:07 PASS rd begin C:\Windows.old\Program Files
+2026-09-22T19:40:08 EXIT rd C:\Windows.old\Program Files code=0
+2026-09-22T19:40:08 PASS attrib/rd begin C:\Windows.old\Program Files
+2026-09-22T19:40:09 EXIT attrib/rd C:\Windows.old\Program Files code=0
+2026-09-22T19:40:09 PASS robocopy/mirror begin C:\Windows.old\Program Files (x86)
+2026-09-22T19:40:10 EXIT robocopy C:\Windows.old\Program Files (x86) code=0
+2026-09-22T19:40:10 PASS robocopy/mirror exit C:\Windows.old\Program Files (x86) code=0
+2026-09-22T19:40:10 PASS rd begin C:\Windows.old\Program Files (x86)
+2026-09-22T19:40:11 EXIT rd C:\Windows.old\Program Files (x86) code=0
+2026-09-22T19:40:11 PASS attrib/rd begin C:\Windows.old\Program Files (x86)
+2026-09-22T19:40:12 EXIT attrib/rd C:\Windows.old\Program Files (x86) code=0
+2026-09-22T19:40:13 EXIT root rd C:\Windows.old code=0
+2026-09-22T19:40:15 ITERATION 8 entries=2
+2026-09-22T19:40:15 PASS robocopy/mirror begin C:\Windows.old\Program Files
+2026-09-22T19:40:16 EXIT robocopy C:\Windows.old\Program Files code=0
+2026-09-22T19:40:16 PASS robocopy/mirror exit C:\Windows.old\Program Files code=0
+2026-09-22T19:40:16 PASS rd begin C:\Windows.old\Program Files
+2026-09-22T19:40:17 EXIT rd C:\Windows.old\Program Files code=0
+2026-09-22T19:40:17 PASS attrib/rd begin C:\Windows.old\Program Files
+2026-09-22T19:40:18 EXIT attrib/rd C:\Windows.old\Program Files code=0
+2026-09-22T19:40:18 PASS robocopy/mirror begin C:\Windows.old\Program Files (x86)
+2026-09-22T19:40:19 EXIT robocopy C:\Windows.old\Program Files (x86) code=0
+2026-09-22T19:40:19 PASS robocopy/mirror exit C:\Windows.old\Program Files (x86) code=0
+2026-09-22T19:40:19 PASS rd begin C:\Windows.old\Program Files (x86)
+2026-09-22T19:40:20 EXIT rd C:\Windows.old\Program Files (x86) code=0
+2026-09-22T19:40:20 PASS attrib/rd begin C:\Windows.old\Program Files (x86)
+2026-09-22T19:40:21 EXIT attrib/rd C:\Windows.old\Program Files (x86) code=0
+2026-09-22T19:40:22 EXIT root rd C:\Windows.old code=0
+2026-09-22T19:40:24 ITERATION 9 entries=2
+2026-09-22T19:40:24 PASS robocopy/mirror begin C:\Windows.old\Program Files
+2026-09-22T19:40:25 EXIT robocopy C:\Windows.old\Program Files code=0
+2026-09-22T19:40:25 PASS robocopy/mirror exit C:\Windows.old\Program Files code=0
+2026-09-22T19:40:25 PASS rd begin C:\Windows.old\Program Files
+2026-09-22T19:40:26 EXIT rd C:\Windows.old\Program Files code=0
+2026-09-22T19:40:26 PASS attrib/rd begin C:\Windows.old\Program Files
+2026-09-22T19:40:27 EXIT attrib/rd C:\Windows.old\Program Files code=0
+2026-09-22T19:40:27 PASS robocopy/mirror begin C:\Windows.old\Program Files (x86)
+2026-09-22T19:40:28 EXIT robocopy C:\Windows.old\Program Files (x86) code=0
+2026-09-22T19:40:28 PASS robocopy/mirror exit C:\Windows.old\Program Files (x86) code=0
+2026-09-22T19:40:28 PASS rd begin C:\Windows.old\Program Files (x86)
+2026-09-22T19:40:29 EXIT rd C:\Windows.old\Program Files (x86) code=0
+2026-09-22T19:40:29 PASS attrib/rd begin C:\Windows.old\Program Files (x86)
+2026-09-22T19:40:30 EXIT attrib/rd C:\Windows.old\Program Files (x86) code=0
+2026-09-22T19:40:31 EXIT root rd C:\Windows.old code=0
+2026-09-22T19:40:33 ITERATION 10 entries=2
+2026-09-22T19:40:33 PASS robocopy/mirror begin C:\Windows.old\Program Files
+2026-09-22T19:40:34 EXIT robocopy C:\Windows.old\Program Files code=0
+2026-09-22T19:40:34 PASS robocopy/mirror exit C:\Windows.old\Program Files code=0
+2026-09-22T19:40:34 PASS rd begin C:\Windows.old\Program Files
+2026-09-22T19:40:35 EXIT rd C:\Windows.old\Program Files code=0
+2026-09-22T19:40:35 PASS attrib/rd begin C:\Windows.old\Program Files
+2026-09-22T19:40:36 EXIT attrib/rd C:\Windows.old\Program Files code=0
+2026-09-22T19:40:36 PASS robocopy/mirror begin C:\Windows.old\Program Files (x86)
+2026-09-22T19:40:37 EXIT robocopy C:\Windows.old\Program Files (x86) code=0
+2026-09-22T19:40:37 PASS robocopy/mirror exit C:\Windows.old\Program Files (x86) code=0
+2026-09-22T19:40:37 PASS rd begin C:\Windows.old\Program Files (x86)
+2026-09-22T19:40:38 EXIT rd C:\Windows.old\Program Files (x86) code=0
+2026-09-22T19:40:38 PASS attrib/rd begin C:\Windows.old\Program Files (x86)
+2026-09-22T19:40:39 EXIT attrib/rd C:\Windows.old\Program Files (x86) code=0
+2026-09-22T19:40:40 EXIT root rd C:\Windows.old code=0
+2026-09-22T19:40:42 ITERATION 11 entries=2
+2026-09-22T19:40:42 PASS robocopy/mirror begin C:\Windows.old\Program Files
+2026-09-22T19:40:43 EXIT robocopy C:\Windows.old\Program Files code=0
+2026-09-22T19:40:43 PASS robocopy/mirror exit C:\Windows.old\Program Files code=0
+2026-09-22T19:40:43 PASS rd begin C:\Windows.old\Program Files
+2026-09-22T19:40:44 EXIT rd C:\Windows.old\Program Files code=0
+2026-09-22T19:40:44 PASS attrib/rd begin C:\Windows.old\Program Files
+2026-09-22T19:40:45 EXIT attrib/rd C:\Windows.old\Program Files code=0
+2026-09-22T19:40:45 PASS robocopy/mirror begin C:\Windows.old\Program Files (x86)
+2026-09-22T19:40:46 EXIT robocopy C:\Windows.old\Program Files (x86) code=0
+2026-09-22T19:40:46 PASS robocopy/mirror exit C:\Windows.old\Program Files (x86) code=0
+2026-09-22T19:40:46 PASS rd begin C:\Windows.old\Program Files (x86)
+2026-09-22T19:40:47 EXIT rd C:\Windows.old\Program Files (x86) code=0
+2026-09-22T19:40:47 PASS attrib/rd begin C:\Windows.old\Program Files (x86)
+2026-09-22T19:40:48 EXIT attrib/rd C:\Windows.old\Program Files (x86) code=0
+2026-09-22T19:40:49 EXIT root rd C:\Windows.old code=0
+2026-09-22T19:40:51 FAILED target still exists
+2026-09-23T21:52:27 START target=C:\Windows.old system=False systemWorker=False
+2026-09-23T21:52:27 SKIP target already absent

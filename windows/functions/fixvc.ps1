@@ -4,7 +4,7 @@
 # was copied from. The module is also force-re-imported when the copy
 # loaded in this process is stale (psm1 changed on disk) so a long-
 # running session never runs an outdated dispatcher.
-$__2scProfileModule = 'C:\Users\micha\Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1'
+$__2scProfileModule = (Join-Path $env:USERPROFILE 'Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1')
 $__2scNeedBootstrap = -not (Get-Command -Name 'Initialize-CodexProfileFunctions' -CommandType Function -ErrorAction SilentlyContinue)
 if (-not $__2scNeedBootstrap) {
     $__2scLoadedModule = Get-Module -Name 'CodexProfileFunctions' -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -27,7 +27,7 @@ if ($__2scNeedBootstrap) {
     Import-Module -Name $__2scProfileModule -Force -DisableNameChecking -ErrorAction Stop
     Initialize-CodexProfileFunctions
 }
-function fixvc { [CmdletBinding()] param([switch]$Elevated,[switch]$DryRun) . 'C:\Users\micha\Documents\WindowsPowerShell\legacy-safe-functions\fixvc.ps1'; & 'fixvc' @PSBoundParameters }
+function fixvc { [CmdletBinding()] param([switch]$Elevated,[switch]$DryRun) . 'C:\Users\Admin\Documents\WindowsPowerShell\legacy-safe-functions\fixvc.ps1'; & 'fixvc' @PSBoundParameters }
 
 if ($MyInvocation.InvocationName -ne '.') {
     & 'fixvc' @args

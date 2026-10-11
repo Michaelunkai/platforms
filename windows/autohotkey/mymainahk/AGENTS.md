@@ -61,3 +61,10 @@ NEVER call TaskOutput or TaskGet with IDs from previous sessions or from other c
 
 
 
+
+## Runtime Architecture Notes
+
+- `current.ahk` is the live shortcut controller. Its `kkkk` gesture snapshots the foreground HWND/PID, refuses protected system/runtime processes, invokes `kkkk-kill-helper.ahk`, and verifies the original PID/creation stamp has exited.
+- `kkkk-kill-helper.ahk` must be launched through `AutoHotkey64.exe /script`; it terminates descendants first with native `TerminateProcess` and has a bounded wait so a hung `taskkill /T` path cannot block the controller.
+- `mmute`/`unmute` resolve the foreground process from its window handle. `mmmute`/`uunmute` use the default CoreAudio capture endpoint and persist the previous scalar level in session state plus `%TEMP%\mic-prev-level.txt`.
+- Ctrl+H keeps a likely game/trainer alive for Wand/D3D continuity: it parks every game window, assigns a named Job Object with a 1% hard CPU cap, applies IDLE/EcoQoS/VERY_LOW memory priority, and schedules the existing trim helper to discard reclaimable pages only after a 2-second pause-only delay. Alt+H persists `resuming` before releasing the limiter so that helper cannot race restoration; fullscreen recovery requires visible and non-iconic state.

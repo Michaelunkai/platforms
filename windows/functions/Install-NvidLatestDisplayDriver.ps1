@@ -3,7 +3,7 @@
 # outside a profile session so it behaves exactly like the function it
 # was copied from.
 if (-not (Get-Command -Name 'Initialize-CodexProfileFunctions' -CommandType Function -ErrorAction SilentlyContinue)) {
-    $__2scProfileModule = 'C:\Users\micha\Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1'
+    $__2scProfileModule = (Join-Path $env:USERPROFILE 'Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1')
     if (-not (Test-Path -LiteralPath $__2scProfileModule -PathType Leaf)) {
         throw "2sc-generated script requires the Codex profile module: $__2scProfileModule"
     }

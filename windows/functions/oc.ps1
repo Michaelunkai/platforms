@@ -4,7 +4,7 @@
 # was copied from. The module is also force-re-imported when the copy
 # loaded in this process is stale (psm1 changed on disk) so a long-
 # running session never runs an outdated dispatcher.
-$__2scProfileModule = 'C:\Users\micha\Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1'
+$__2scProfileModule = 'C:\Users\Admin\Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1'
 $__2scNeedBootstrap = -not (Get-Command -Name 'Initialize-CodexProfileFunctions' -CommandType Function -ErrorAction SilentlyContinue)
 if (-not $__2scNeedBootstrap) {
     $__2scLoadedModule = Get-Module -Name 'CodexProfileFunctions' -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -31,9 +31,9 @@ function oc {
     [CmdletBinding()]
     param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Args)
 
-    $script = 'C:\Users\micha\Documents\WindowsPowerShell\legacy-safe-functions\Invoke-OpenCodeCli.ps1'
+    $script = 'F:\backup\windowsapps\installed\OpenCodeRuntime\Invoke-OpenCodeCli.ps1'
     if (-not (Test-Path -LiteralPath $script -PathType Leaf)) {
-        throw "OpenCode launcher script is missing: $script"
+        throw "OpenCode launcher script is missing: $script. Run GETOC2 first."
     }
     & $script @Args
 }

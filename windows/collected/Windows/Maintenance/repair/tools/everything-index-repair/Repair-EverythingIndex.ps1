@@ -35,8 +35,41 @@ function Get-EverythingStableDownload {
     }
 }
 
+function Stop-EverythingClientsForPath {
+    param(
+        [string]$ExecutablePath
+    )
+
+    if ([string]::IsNullOrWhiteSpace($ExecutablePath)) {
+        return
+    }
+
+    try {
+        $targetPath = [System.IO.Path]::GetFullPath($ExecutablePath)
+    } catch {
+        return
+    }
+
+    foreach ($process in Get-CimInstance Win32_Process -Filter "Name='Everything.exe'" -ErrorAction SilentlyContinue) {
+        if ([string]::IsNullOrWhiteSpace($process.ExecutablePath)) { continue }
+        if ($process.CommandLine -match '(?i)(?:^|\s)-svc(?:\s|$)') { continue }
+        try {
+            $processPath = [System.IO.Path]::GetFullPath($process.ExecutablePath)
+        } catch {
+            continue
+        }
+        if ($processPath.Equals($targetPath, [System.StringComparison]::OrdinalIgnoreCase)) {
+            Stop-Process -Id $process.ProcessId -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
 function Stop-EverythingProcessesAndService {
-    Get-Process everything -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    param(
+        [string]$EverythingExe
+    )
+
+    Stop-EverythingClientsForPath -ExecutablePath $EverythingExe
     Start-Sleep -Seconds 2
 
     $service = Get-CimInstance Win32_Service -Filter "Name='Everything'" -ErrorAction SilentlyContinue
@@ -46,7 +79,7 @@ function Stop-EverythingProcessesAndService {
     }
 
     for ($i = 0; $i -lt 45; $i++) {
-        Get-Process everything -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+        Stop-EverythingClientsForPath -ExecutablePath $EverythingExe
         $service = Get-CimInstance Win32_Service -Filter "Name='Everything'" -ErrorAction SilentlyContinue
         if (-not $service) {
             return
@@ -108,7 +141,7 @@ function Repair-EverythingService {
         [string]$EverythingExe
     )
 
-    Get-Process everything -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    Stop-EverythingClientsForPath -ExecutablePath $EverythingExe
     Start-Sleep -Seconds 2
 
     $binaryPath = '"' + $EverythingExe + '" -svc'
@@ -210,8 +243,12 @@ if (-not $SkipDownload) {
     throw ('SkipDownload was used, but installer is missing: ' + $installer)
 }
 
+$repairTargetExe = Join-Path $env:ProgramFiles 'Everything\Everything.exe'
+if (-not (Test-Path -LiteralPath $repairTargetExe -PathType Leaf)) {
+    $repairTargetExe = 'F:\backup\windowsapps\installed\Everything\Everything.exe'
+}
 Write-Step 'Stopping Everything and clearing half-deleted service states.'
-Stop-EverythingProcessesAndService
+Stop-EverythingProcessesAndService -EverythingExe $repairTargetExe
 
 $backupPath = Backup-And-Remove-StaleEverythingState
 Write-Step ('Backed up stale state to ' + $backupPath)

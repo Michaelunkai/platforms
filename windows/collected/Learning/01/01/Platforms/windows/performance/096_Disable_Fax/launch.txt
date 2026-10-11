@@ -1,1 +1,0 @@
-﻿Stop-Service -Name "Fax" -Force -ErrorAction SilentlyContinue; Set-Service -Name "Fax" -StartupType Disabled; Write-Host "Fax service disabled"

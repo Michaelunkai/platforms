@@ -4,7 +4,7 @@
 # was copied from. The module is also force-re-imported when the copy
 # loaded in this process is stale (psm1 changed on disk) so a long-
 # running session never runs an outdated dispatcher.
-$__2scProfileModule = 'C:\Users\micha\Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1'
+$__2scProfileModule = (Join-Path $env:USERPROFILE 'Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1')
 $__2scNeedBootstrap = -not (Get-Command -Name 'Initialize-CodexProfileFunctions' -CommandType Function -ErrorAction SilentlyContinue)
 if (-not $__2scNeedBootstrap) {
     $__2scLoadedModule = Get-Module -Name 'CodexProfileFunctions' -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -34,7 +34,7 @@ function Invoke-ProfileFixFRunner {
         [Parameter(Mandatory = $true)][string]$ArtifactPath
     )
 
-    $portableRoot = 'C:\Users\micha\Documents\WindowsPowerShell\ProfileSources\ps5-profile-portable'
+    $portableRoot = 'C:\Users\Admin\Documents\WindowsPowerShell\ProfileSources\ps5-profile-portable'
     $workingDirectory = 'F:\study'
     if (-not (Test-Path -LiteralPath $ArtifactPath -PathType Leaf)) {
         throw "${Name}: repair artifact is missing: $ArtifactPath"

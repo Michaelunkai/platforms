@@ -1,0 +1,19 @@
+﻿[2026-09-07T13:55:56.456+03:00] [ERROR] Could not validate protected execution path: Cannot find path 'C:\ProgramData\SafeRebootGuard' because it does not exist.
+[2026-09-07T13:55:57.137+03:00] [INFO] SafeToRequestReboot=False; PendingSignals=6; ActiveProcesses=1; RunningTasks=0
+[2026-09-07T13:55:57.158+03:00] [INFO] Policy HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU\NoAutoRebootWithLoggedOnUsers: Exists=True; ValueExists=True; Value=1; Type=DWord
+[2026-09-07T13:55:57.160+03:00] [WARN] Pending reboot signal: CBS RebootPending key (HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending)
+[2026-09-07T13:55:57.161+03:00] [WARN] Pending reboot signal: CBS PackagesPending key (HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\PackagesPending)
+[2026-09-07T13:55:57.163+03:00] [WARN] Pending reboot signal: Windows Update RebootRequired key (HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired)
+[2026-09-07T13:55:57.164+03:00] [WARN] Pending reboot signal: PendingFileRenameOperations (HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager)
+[2026-09-07T13:55:57.166+03:00] [WARN] Pending reboot signal: Unable to read UpdateExeVolatile (The property 'UpdateExeVolatile' cannot be found on this object. Verify that the property exists.)
+[2026-09-07T13:55:57.167+03:00] [WARN] Pending reboot signal: WinSxS pending.xml (C:\Windows\WinSxS\pending.xml)
+[2026-09-07T13:55:57.168+03:00] [WARN] Active servicing/update process: MoUsoCoreWorker (PID 25700)
+[2026-09-07T13:55:57.170+03:00] [WARN] Audit result: reboot is not approved by this guard.
+[2026-09-07T14:00:00.582+03:00] [ERROR] Mutating modes require the script directly under the protected path C:\ProgramData\SafeRebootGuard; current path is F:\study\Platforms\windows\reboot\RebootFixUpdatesStuck\Invoke-SafeFastReboot.ps1.
+[2026-09-07T14:01:14.025+03:00] [ERROR] Mutating modes require the script directly under the protected path C:\ProgramData\SafeRebootGuard; current path is F:\study\Platforms\windows\reboot\RebootFixUpdatesStuck\Invoke-SafeFastReboot.ps1.
+[2026-09-07T17:17:36.174+03:00] [INFO] SafeToRequestReboot=False; PendingSignals=1; ActiveProcesses=2; RunningTasks=0
+[2026-09-07T17:17:36.214+03:00] [INFO] Policy HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU\NoAutoRebootWithLoggedOnUsers: Exists=True; ValueExists=True; Value=1; Type=DWord
+[2026-09-07T17:17:36.217+03:00] [WARN] Pending reboot signal: PendingFileRenameOperations (HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager)
+[2026-09-07T17:17:36.219+03:00] [WARN] Active servicing/update process: TrustedInstaller (PID 38148)
+[2026-09-07T17:17:36.221+03:00] [WARN] Active servicing/update process: TiWorker (PID 38156)
+[2026-09-07T17:17:36.222+03:00] [WARN] Audit result: reboot is not approved by this guard.

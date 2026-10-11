@@ -4,7 +4,7 @@
 # was copied from. The module is also force-re-imported when the copy
 # loaded in this process is stale (psm1 changed on disk) so a long-
 # running session never runs an outdated dispatcher.
-$__2scProfileModule = 'C:\Users\micha\Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1'
+$__2scProfileModule = (Join-Path $env:USERPROFILE 'Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1')
 $__2scNeedBootstrap = -not (Get-Command -Name 'Initialize-CodexProfileFunctions' -CommandType Function -ErrorAction SilentlyContinue)
 if (-not $__2scNeedBootstrap) {
     $__2scLoadedModule = Get-Module -Name 'CodexProfileFunctions' -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -68,14 +68,14 @@ if (-not (Test-Path -LiteralPath $backupScript -PathType Leaf)) { throw "BE: pro
 
 # ---- count functions changed since the previous be run (before any step can alter state) ----
 $countPaths = @(
-    'C:\Users\micha\Documents\WindowsPowerShell\Microsoft.PowerShell_profile.ps1',
-    'C:\Users\micha\Documents\PowerShell\Microsoft.PowerShell_profile.ps1',
-    'C:\Users\micha\Documents\WindowsPowerShell\ProfileSources\ps5-profile-portable\Microsoft.PowerShell_profile.runtime.ps1',
-    'C:\Users\micha\Documents\WindowsPowerShell\ProfileSources\ps5-profile-portable\Microsoft.PowerShell_profile.full.ps1',
-    'C:\Users\micha\Documents\WindowsPowerShell\ProfileSources\ps5-profile-portable\Microsoft.PowerShell_profile.full.definitions.ps1',
-    'C:\Users\micha\Documents\WindowsPowerShell\ProfileSources\ps5-profile-portable\Microsoft.PowerShell_profile.ps1',
-    'C:\Users\micha\Documents\WindowsPowerShell\ProfileSources\ps5-profile-portable\legacy-safe-functions',
-    'C:\Users\micha\Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psm1'
+    'C:\Users\Admin\Documents\WindowsPowerShell\Microsoft.PowerShell_profile.ps1',
+    'C:\Users\Admin\Documents\PowerShell\Microsoft.PowerShell_profile.ps1',
+    'C:\Users\Admin\Documents\WindowsPowerShell\ProfileSources\ps5-profile-portable\Microsoft.PowerShell_profile.runtime.ps1',
+    'C:\Users\Admin\Documents\WindowsPowerShell\ProfileSources\ps5-profile-portable\Microsoft.PowerShell_profile.full.ps1',
+    'C:\Users\Admin\Documents\WindowsPowerShell\ProfileSources\ps5-profile-portable\Microsoft.PowerShell_profile.full.definitions.ps1',
+    'C:\Users\Admin\Documents\WindowsPowerShell\ProfileSources\ps5-profile-portable\Microsoft.PowerShell_profile.ps1',
+    'C:\Users\Admin\Documents\WindowsPowerShell\ProfileSources\ps5-profile-portable\legacy-safe-functions',
+    'C:\Users\Admin\Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psm1'
 )
 $currentMap = @{}
 foreach ($p in $countPaths) {
@@ -117,8 +117,28 @@ if ($snapshotExisted) {
 # ---- the four steps, in the user's exact order ----
 Write-Host 'BE: [1/4] Reloading current profile (. $profile)...' -ForegroundColor Cyan
 . $profile
+# The fast profile cache does not index the external GMenu runtime. Restore it
+# after every be reload so gm and ggm remain available in the current session.
+$gmenuBootstrapCandidates = @(
+    'F:\study\Platforms\windows\functions\GMenuFunctions.ps1',
+    (Join-Path $env:USERPROFILE 'Documents\WindowsPowerShell\GMenuFallback\GMenuFunctions.ps1')
+)
+foreach($gmenuBootstrapSource in @($gmenuBootstrapCandidates | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf -ErrorAction SilentlyContinue })) {
+    try { . $gmenuBootstrapSource } catch { continue }
+    if((Get-Command Invoke-GMenuCommand -CommandType Function -ErrorAction SilentlyContinue) -and
+       (Get-Command gm -CommandType Function -ErrorAction SilentlyContinue) -and
+       (Get-Command ggm -CommandType Function -ErrorAction SilentlyContinue)){break}
+}
+if(-not (Get-Command gm -CommandType Function -ErrorAction SilentlyContinue) -or
+   -not (Get-Command ggm -CommandType Function -ErrorAction SilentlyContinue)) {
+    throw 'BE: GMenu commands were not restored after profile reload.'
+}
 Write-Host 'BE: [2/4] Backing up profile files (latest functions)...' -ForegroundColor Cyan
-try { & $backupScript } catch { throw "BE: profile backup failed: $($_.Exception.Message)" }
+$profileBackupHost = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+try {
+    & $profileBackupHost -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $backupScript
+    if ($LASTEXITCODE -ne 0) { throw "profile backup child exit code: $LASTEXITCODE" }
+} catch { throw "BE: profile backup failed: $($_.Exception.Message)" }
 Write-Host 'BE: [3/4] Syncing PowerShell 7 profile (ps527)...' -ForegroundColor Cyan
 $ps527Command = Get-Command ps527 -CommandType Function -ErrorAction SilentlyContinue | Select-Object -First 1
 if (-not $ps527Command) { throw 'BE: ps527 function is unavailable after profile reload.' }

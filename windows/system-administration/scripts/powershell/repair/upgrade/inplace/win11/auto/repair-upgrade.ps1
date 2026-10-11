@@ -1,19 +1,21 @@
-#Requires -RunAsAdministrator
+﻿#Requires -RunAsAdministrator
 # repair-upgrade.ps1 - Fully automatic Windows 11 in-place repair upgrade
 # Extracts ISO to durable project-owned storage so migcore.dll and all migration DLLs are local
-# Zero manual steps. Zero errors. Run elevated and walk away.
+# Unattended setup with validated installation media and explicit failure reporting.
 
 param(
     [string]$IsoSource = "F:\isos\Windows.iso",
-    [string]$ExtractDir = "F:\study\Platforms\windows\system-administration\scripts\powershell\repair\upgrade\inplace\win11\auto\runtime\WinSetup",
+    [string]$ExtractDir = "C:\WinSetupCache\WinSetup",
     [string]$LocalIso = "F:\study\Platforms\windows\system-administration\scripts\powershell\repair\upgrade\inplace\win11\auto\cache\Windows.iso",
     [string]$LatestUpdateDownloadDir = "F:\study\Platforms\windows\system-administration\scripts\powershell\repair\upgrade\inplace\win11\auto\downloads\updates",
     [switch]$DisableDynamicUpdate,
     [switch]$SkipLatestUpdateDownload,
     [switch]$ForceClearRebootPending,
+    [switch]$Silent,
     [switch]$VerifyAutomationOnly,
     [switch]$VerifyIsoPreparationOnly,
     [switch]$VerifyCleanupOnly,
+    [switch]$CompatibilityScanOnly,
     [int]$MonitorExistingSetupProcessId = 0,
     [switch]$RegisterPostBootOnly,
     [string]$PostBootCommand = 'c; rrm windows.old',
@@ -24,6 +26,8 @@ $ErrorActionPreference = 'Stop'
 $host.UI.RawUI.WindowTitle = "Repair Upgrade - Automated"
 $script:RepairUpgradeScriptRoot = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
 $script:RepairUpgradePostBootRoot = Join-Path $script:RepairUpgradeScriptRoot 'postboot'
+$script:RepairUpgradeRuntimeRoot = Join-Path $script:RepairUpgradeScriptRoot 'runtime'
+$script:RepairUpgradeProgressPath = Join-Path $script:RepairUpgradeRuntimeRoot 'repair-upgrade-progress.json'
 $script:RepairUpgradeTracePath = $env:REPAIR_UPGRADE_TRACE_PATH
 $script:RepairUpgradeTracingEnabled = -not [string]::IsNullOrWhiteSpace($script:RepairUpgradeTracePath)
 $script:RepairUpgradeProgressId = 19421
@@ -212,7 +216,7 @@ function Invoke-RobocopyTree {
         [Parameter(Mandatory=$true)][string]$DestinationPath
     )
 
-    & robocopy $SourcePath $DestinationPath /E /MT:8 /NFL /NDL /NJH /NJS /R:2 /W:1 | Out-Null
+    & robocopy $SourcePath $DestinationPath /E /MT:16 /NFL /NDL /NJH /NJS /R:1 /W:0 /NP | Out-Null
     if ($LASTEXITCODE -gt 7) {
         throw "Robocopy from $SourcePath to $DestinationPath failed with exit code $LASTEXITCODE"
     }
@@ -276,21 +280,17 @@ function Remove-RepairUpgradeFolderSafely {
         }
     }
 
-    Write-Host ("    Attempting fast child-first removal of {0} ..." -f $Path) -ForegroundColor DarkCyan
-    Write-TraceLine ("REMOVE child-first begin {0}" -f $Path)
-    $childItems = @(Get-ChildItem -LiteralPath $Path -Force -ErrorAction SilentlyContinue)
-    foreach ($childItem in $childItems) {
-        & $tryFastRemove $childItem.FullName ("fast remove {0}" -f $childItem.FullName)
-    }
+    Write-Host ("    Fast removal of {0} ..." -f $Path) -ForegroundColor DarkCyan
+    Write-TraceLine ("REMOVE fast begin {0}" -f $Path)
     & $tryFastRemove $Path ("fast remove {0}" -f $Path)
     if (-not (Test-Path -LiteralPath $Path)) {
-        Write-TraceLine ("REMOVE child-first success {0}" -f $Path)
+        Write-TraceLine ("REMOVE fast success {0}" -f $Path)
         Write-Ok "Removed $Path"
         return
     }
 
     try {
-        $takeownExit = Invoke-RepairUpgradeBoundedNativeCommand -FilePath (Join-Path $env:SystemRoot 'System32\takeown.exe') -ArgumentList @('/f', $Path, '/r', '/d', 'y') -Label ("takeown {0}" -f $Path) -TimeoutSeconds 45
+        $takeownExit = Invoke-RepairUpgradeBoundedNativeCommand -FilePath (Join-Path $env:SystemRoot 'System32\takeown.exe') -ArgumentList @('/f', $Path, '/r', '/d', 'y') -Label ("takeown {0}" -f $Path) -TimeoutSeconds 15
         if ($takeownExit -ne 0) {
             Write-Warn "takeown exited with code $takeownExit for $Path"
         }
@@ -298,7 +298,7 @@ function Remove-RepairUpgradeFolderSafely {
         Write-Warn $_.Exception.Message
     }
     try {
-        $icaclsExit = Invoke-RepairUpgradeBoundedNativeCommand -FilePath (Join-Path $env:SystemRoot 'System32\icacls.exe') -ArgumentList @($Path, '/grant', 'administrators:F', '/t') -Label ("icacls {0}" -f $Path) -TimeoutSeconds 45
+        $icaclsExit = Invoke-RepairUpgradeBoundedNativeCommand -FilePath (Join-Path $env:SystemRoot 'System32\icacls.exe') -ArgumentList @($Path, '/grant', 'administrators:F', '/t') -Label ("icacls {0}" -f $Path) -TimeoutSeconds 15
         if ($icaclsExit -ne 0) {
             Write-Warn "icacls exited with code $icaclsExit for $Path"
         }
@@ -324,64 +324,88 @@ function Remove-RepairUpgradeFolderSafely {
         Write-Ok "Removed $Path"
     }
 }
-function Get-RepairUpgradeSetupLogSnapshot {
-    $candidateLogs = @(
+function Get-RepairUpgradeSetupLogCandidates {
+    return @(
         'C:\$WINDOWS.~BT\Sources\Panther\setupact.log',
-        'C:\$WINDOWS.~BT\Sources\Rollback\setupact.log'
+        'C:\$WINDOWS.~BT\Sources\Rollback\setupact.log',
+        'C:\$WINDOWS.~BT\Sources\Panther\setuperr.log',
+        'C:\Windows\Panther\setupact.log',
+        'C:\Windows\Panther\setuperr.log',
+        'C:\Windows\Logs\MoSetup\BlueBox.log',
+        'C:\$WINDOWS.~BT\Sources\Panther\dism.log',
+        'C:\Windows\Logs\DISM\dism.log'
     )
-    $logPath = $candidateLogs | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
-    if (-not $logPath) {
+}
+function Get-RepairUpgradeSetupLogSnapshot {
+    $items = New-Object System.Collections.Generic.List[object]
+    foreach ($candidate in (Get-RepairUpgradeSetupLogCandidates)) {
+        try {
+            if (Test-Path -LiteralPath $candidate) {
+                $items.Add((Get-Item -LiteralPath $candidate -Force -ErrorAction Stop))
+            }
+        } catch { }
+    }
+    if ($items.Count -eq 0) {
         return [pscustomobject]@{
             Path = $null
             LastWriteTime = $null
             ProgressPercent = $null
             ActivityLine = $null
+            TotalBytes = [int64]0
+            SignalKey = $null
         }
     }
 
-    $item = Get-Item -LiteralPath $logPath -Force
-    $tail = @(Get-Content -LiteralPath $logPath -Tail 80 -ErrorAction SilentlyContinue)
+    $newest = $items | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    $totalBytes = [int64]0
+    foreach ($logItem in $items) { $totalBytes += [int64]$logItem.Length }
+
     $progressPercent = $null
     $activityLine = $null
-    $reversedTail = @($tail)
-    [array]::Reverse($reversedTail)
-    foreach ($line in $reversedTail) {
-        if (-not $activityLine -and $line -match 'Overall progress: \[(\d+)%\]') {
-            $progressPercent = [int]$Matches[1]
-            $activityLine = $line.Trim()
-            continue
+    if ([int64]$newest.Length -le 67108864) {
+        $tail = @(Get-Content -LiteralPath $newest.FullName -Tail 40 -ErrorAction SilentlyContinue)
+        $reversedTail = @($tail)
+        [array]::Reverse($reversedTail)
+        foreach ($line in $reversedTail) {
+            if (-not $activityLine -and $line -match 'Overall progress: \[(\d+)%\]') {
+                $progressPercent = [int]$Matches[1]
+                $activityLine = $line.Trim()
+                continue
+            }
+            if (-not $activityLine -and $line -match 'Action progress: \[(\d+)%\]') {
+                $progressPercent = [int]$Matches[1]
+                $activityLine = $line.Trim()
+                continue
+            }
+            if (-not $activityLine -and $line -match 'SPWIMCallback: .*?Progress:\s*(\d+)') {
+                $progressPercent = [int]$Matches[1]
+                $activityLine = $line.Trim()
+                continue
+            }
+            if (-not $activityLine -and $line -match 'Progress percentage \[(\d+)\]') {
+                $progressPercent = [int]$Matches[1]
+                $activityLine = $line.Trim()
+                continue
+            }
+            if (-not $activityLine -and $line -match 'Transfer: .*?\[(\d+)%\]') {
+                $progressPercent = [int]$Matches[1]
+                $activityLine = $line.Trim()
+                continue
+            }
+            if (-not $activityLine -and $line -match 'Executing download|Successfully acquired payload|Download progress|Installing|Finalize|Migration|Appraiser|Expanding|Extracting|Processing|Apply Deltas|Data migration complete|VALIDATION|Capabilities|provisioning|OPERATIONTRACK|QueueAddCbsPackage|Add \[\d+\] package|Machine-specific apply|Machine-independent apply|Complete servicing operations|Refresh localized strings|boot settings|DiskSpaceReq') {
+                $activityLine = $line.Trim()
+            }
+            if ($progressPercent -ne $null -and $activityLine) { break }
         }
-        if (-not $activityLine -and $line -match 'Action progress: \[(\d+)%\]') {
-            $progressPercent = [int]$Matches[1]
-            $activityLine = $line.Trim()
-            continue
-        }
-        if (-not $activityLine -and $line -match 'SPWIMCallback: .*?Progress:\s*(\d+)') {
-            $progressPercent = [int]$Matches[1]
-            $activityLine = $line.Trim()
-            continue
-        }
-        if (-not $activityLine -and $line -match 'Progress percentage \[(\d+)\]') {
-            $progressPercent = [int]$Matches[1]
-            $activityLine = $line.Trim()
-            continue
-        }
-        if (-not $activityLine -and $line -match 'Transfer: .*?\[(\d+)%\]') {
-            $progressPercent = [int]$Matches[1]
-            $activityLine = $line.Trim()
-            continue
-        }
-        if (-not $activityLine -and $line -match 'Executing download|Successfully acquired payload|Download progress|Installing|Finalize|Migration|Appraiser|Expanding|Extracting|Processing|Apply Deltas|Data migration complete|VALIDATION|Capabilities|provisioning|OPERATIONTRACK|QueueAddCbsPackage|Add \[\d+\] package|Machine-specific apply|Machine-independent apply|Complete servicing operations|Refresh localized strings|boot settings|DiskSpaceReq') {
-            $activityLine = $line.Trim()
-        }
-        if ($progressPercent -ne $null -and $activityLine) { break }
     }
 
     return [pscustomobject]@{
-        Path = $logPath
-        LastWriteTime = $item.LastWriteTime
+        Path = $newest.FullName
+        LastWriteTime = $newest.LastWriteTime
         ProgressPercent = $progressPercent
         ActivityLine = $activityLine
+        TotalBytes = $totalBytes
+        SignalKey = ('{0}|{1}' -f $newest.LastWriteTime.Ticks, $totalBytes)
     }
 }
 function Get-RepairUpgradeSetupPhaseDefinition {
@@ -490,41 +514,113 @@ function Get-ActiveRepairUpgradeSetupProcess {
         Sort-Object @{Expression = { if ($_.Name -ieq 'setup.exe') { 0 } elseif ($_.Name -ieq 'SetupHost.exe') { 1 } else { 2 } }}, CreationDate |
         Select-Object -First 1
 }
+function Get-RepairUpgradeSetupProcessActivity {
+    param(
+        [int]$RootProcessId = 0,
+        [string]$ExpectedExtractDir
+    )
+
+    $all = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue)
+    if ($all.Count -eq 0) {
+        return [pscustomobject]@{ Count = 0; TotalCpuSeconds = 0.0; NewestCreationTime = $null }
+    }
+
+    $byParent = @{}
+    foreach ($process in $all) {
+        $parentKey = [int]$process.ParentProcessId
+        if (-not $byParent.ContainsKey($parentKey)) { $byParent[$parentKey] = New-Object System.Collections.Generic.List[object] }
+        $byParent[$parentKey].Add($process)
+    }
+
+    $escapedExtractDir = if ($ExpectedExtractDir) { [regex]::Escape($ExpectedExtractDir) } else { $null }
+    $seen = @{}
+    $queue = New-Object System.Collections.Generic.Queue[object]
+    foreach ($process in $all) {
+        $isSetupRoot = $process.Name -in @('setup.exe', 'SetupHost.exe', 'setupprep.exe')
+        $matchesExtract = $escapedExtractDir -and $process.CommandLine -and ($process.CommandLine -match $escapedExtractDir)
+        $matchesAutoUpgrade = $process.CommandLine -and ($process.CommandLine -match '\/Auto Upgrade')
+        $isRootId = ($RootProcessId -gt 0 -and [int]$process.ProcessId -eq $RootProcessId)
+        if (($isSetupRoot -or $matchesExtract -or $matchesAutoUpgrade -or $isRootId) -and -not $seen.ContainsKey([int]$process.ProcessId)) {
+            $seen[[int]$process.ProcessId] = $true
+            $queue.Enqueue($process)
+        }
+    }
+
+    $totalCpuTicks = [uint64]0
+    $newestCreation = $null
+    $count = 0
+    while ($queue.Count -gt 0) {
+        $current = $queue.Dequeue()
+        $count++
+        $totalCpuTicks += [uint64]$current.KernelModeTime + [uint64]$current.UserModeTime
+        if ($current.CreationDate -and ($null -eq $newestCreation -or $current.CreationDate -gt $newestCreation)) { $newestCreation = $current.CreationDate }
+        if ($byParent.ContainsKey([int]$current.ProcessId)) {
+            foreach ($child in $byParent[[int]$current.ProcessId]) {
+                if (-not $seen.ContainsKey([int]$child.ProcessId)) {
+                    $seen[[int]$child.ProcessId] = $true
+                    $queue.Enqueue($child)
+                }
+            }
+        }
+    }
+
+    return [pscustomobject]@{
+        Count = $count
+        TotalCpuSeconds = [Math]::Round(([double]$totalCpuTicks / 10000000.0), 3)
+        NewestCreationTime = $newestCreation
+    }
+}
 function Wait-RepairUpgradeSetup {
     param(
         [Parameter(Mandatory=$true)]$Process,
-        [int]$HeartbeatSeconds = 5,
-        [int]$NoActivityTimeoutSeconds = 900
+        [int]$HeartbeatSeconds = 4,
+        [int]$NoActivityTimeoutSeconds = 1800,
+        [int]$HardIdleCeilingSeconds = 10800
     )
 
     $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
     $lastSignalTime = Get-Date
-    $lastLogWriteTime = $null
+    $lastSignalKey = $null
+    $lastAggregateCpu = $null
+    $lastProcessCount = $null
     $lastReportedStatus = $null
-    $lastProcessCpu = $null
+    $idleWarned = $false
     $phaseDefinition = Get-RepairUpgradeSetupPhaseDefinition -ActivityLine $null
     $phaseSignature = $phaseDefinition.Name
     $phaseStartTime = Get-Date
 
     while (-not $Process.HasExited) {
-        Start-Sleep -Seconds 1
+        Start-Sleep -Seconds 4
         try { $Process.Refresh() } catch { }
 
         $logSnapshot = Get-RepairUpgradeSetupLogSnapshot
-        $logChanged = $logSnapshot.LastWriteTime -and ($lastLogWriteTime -ne $logSnapshot.LastWriteTime)
-        if ($logChanged) {
-            $lastLogWriteTime = $logSnapshot.LastWriteTime
-            $lastSignalTime = Get-Date
-        }
+        $processActivity = Get-RepairUpgradeSetupProcessActivity -RootProcessId $Process.Id
+
+        $logAdvanced = [bool]($logSnapshot.SignalKey -and ($lastSignalKey -ne $logSnapshot.SignalKey))
+        if ($logAdvanced) { $lastSignalKey = $logSnapshot.SignalKey }
+
         $cpuAdvanced = $false
-        if ($null -ne $Process.CPU) {
-            if ($null -eq $lastProcessCpu) {
-                $lastProcessCpu = $Process.CPU
-            } elseif ($Process.CPU -gt $lastProcessCpu) {
-                $cpuAdvanced = $true
-                $lastProcessCpu = $Process.CPU
-                $lastSignalTime = Get-Date
-            }
+        if ($null -eq $lastAggregateCpu) {
+            $lastAggregateCpu = $processActivity.TotalCpuSeconds
+        } elseif ($processActivity.TotalCpuSeconds -gt ($lastAggregateCpu + 0.05)) {
+            $cpuAdvanced = $true
+            $lastAggregateCpu = $processActivity.TotalCpuSeconds
+        }
+
+        $processAppeared = $false
+        if ($null -eq $lastProcessCount) {
+            $lastProcessCount = $processActivity.Count
+        } elseif ($processActivity.Count -gt $lastProcessCount) {
+            $processAppeared = $true
+            $lastProcessCount = $processActivity.Count
+        } elseif ($processActivity.Count -lt $lastProcessCount) {
+            $lastProcessCount = $processActivity.Count
+        }
+
+        $hasFreshSignal = [bool]($logAdvanced -or $cpuAdvanced -or $processAppeared)
+        if ($hasFreshSignal) {
+            $lastSignalTime = Get-Date
+            $idleWarned = $false
         }
 
         $currentPhaseDefinition = Get-RepairUpgradeSetupPhaseDefinition -ActivityLine $logSnapshot.ActivityLine
@@ -533,12 +629,13 @@ function Wait-RepairUpgradeSetup {
             $phaseDefinition = $currentPhaseDefinition
             $phaseSignature = $currentPhaseSignature
             $phaseStartTime = Get-Date
+            $lastSignalTime = Get-Date
+            $idleWarned = $false
             Write-TraceLine ("SETUP phase {0}" -f $phaseDefinition.Name)
         }
 
         if (($stopwatch.Elapsed.TotalSeconds % $HeartbeatSeconds) -lt 1) {
             $statusParts = @()
-            $hasFreshSignal = $logChanged -or $cpuAdvanced
             $displayPercent = Get-RepairUpgradeDisplayPercent -PhaseStartPercent $phaseDefinition.StartPercent -PhaseEndPercent $phaseDefinition.EndPercent -PhaseStartTime $phaseStartTime -LastSignalTime $lastSignalTime -ExpectedSeconds $phaseDefinition.ExpectedSeconds -LogProgressPercent $logSnapshot.ProgressPercent -HasFreshSignal:$hasFreshSignal
             $percent = [Math]::Floor($displayPercent)
             $statusParts += ("setup {0:n2}% est" -f $displayPercent)
@@ -552,11 +649,10 @@ function Wait-RepairUpgradeSetup {
                 $ageSeconds = [int]((Get-Date) - $logSnapshot.LastWriteTime).TotalSeconds
                 $statusParts += ("log age {0}s" -f $ageSeconds)
             }
-            if ($null -ne $Process.CPU) {
-                $statusParts += ("cpu {0:n1}s" -f [double]$Process.CPU)
-            }
-            if ($cpuAdvanced -and -not $logChanged) {
-                $statusParts += 'SetupHost CPU advancing'
+            $statusParts += ("setup procs {0}" -f $processActivity.Count)
+            $statusParts += ("tree cpu {0:n1}s" -f $processActivity.TotalCpuSeconds)
+            if ($cpuAdvanced -and -not $logAdvanced) {
+                $statusParts += 'setup tree CPU advancing'
             }
             if (-not $hasFreshSignal) {
                 $signalAgeSeconds = [int]((Get-Date) - $lastSignalTime).TotalSeconds
@@ -564,9 +660,6 @@ function Wait-RepairUpgradeSetup {
             }
             if ($logSnapshot.ActivityLine) {
                 $statusParts += $logSnapshot.ActivityLine
-            }
-            if ($statusParts.Count -eq 0) {
-                $statusParts += ("setup.exe running for {0}s" -f [int]$stopwatch.Elapsed.TotalSeconds)
             }
             $status = ($statusParts -join ' | ')
             Update-RepairUpgradeProgress -Status $status -PercentComplete $percent
@@ -577,10 +670,22 @@ function Wait-RepairUpgradeSetup {
             }
         }
 
-        if (((Get-Date) - $lastSignalTime).TotalSeconds -ge $NoActivityTimeoutSeconds) {
-            $diagnostic = if ($logSnapshot.ActivityLine) { $logSnapshot.ActivityLine } else { 'no recent setup log activity detected' }
-            Stop-Process -Id $Process.Id -Force -ErrorAction SilentlyContinue
-            throw "Windows setup monitoring timed out after $NoActivityTimeoutSeconds seconds without activity: $diagnostic"
+        $idleSeconds = ((Get-Date) - $lastSignalTime).TotalSeconds
+        if ($idleSeconds -ge $NoActivityTimeoutSeconds) {
+            if ($processActivity.Count -eq 0) {
+                Write-TraceLine "SETUP process tree empty; awaiting launcher exit"
+                break
+            }
+            if (-not $idleWarned) {
+                $idleWarned = $true
+                $idleMessage = ("Windows setup produced no fresh signal for {0:n0}s, but the setup process tree is still active ({1} processes, cpu {2:n1}s); continuing to wait instead of aborting." -f $idleSeconds, $processActivity.Count, $processActivity.TotalCpuSeconds)
+                Write-Warn $idleMessage
+                Write-TraceLine ("SETUP idle-warn {0}" -f $idleMessage)
+            }
+            if ($idleSeconds -ge $HardIdleCeilingSeconds) {
+                $diagnostic = if ($logSnapshot.ActivityLine) { $logSnapshot.ActivityLine } else { 'no recent setup log activity detected' }
+                throw "Windows setup has no observed activity for $([int]$idleSeconds) seconds and exceeded the hard idle ceiling; process $($Process.Id) was left running to avoid interrupting installation: $diagnostic"
+            }
         }
     }
 
@@ -597,6 +702,7 @@ function Convert-RepairUpgradeExitCodeToHex {
     return ('0x{0:X8}' -f ([uint32]$ExitCode))
 }
 function Get-RepairUpgradeBlueBoxSnapshot {
+    param([datetime]$Since = [datetime]::MinValue)
     $logPath = 'C:\Windows\Logs\MoSetup\BlueBox.log'
     if (-not (Test-Path -LiteralPath $logPath)) {
         return [pscustomobject]@{
@@ -610,7 +716,10 @@ function Get-RepairUpgradeBlueBoxSnapshot {
         }
     }
 
-    $tail = @(Get-Content -LiteralPath $logPath -Tail 200 -ErrorAction SilentlyContinue)
+    $tail = @(Get-Content -LiteralPath $logPath -Tail 200 -ErrorAction SilentlyContinue | Where-Object {
+        $timestamp = [datetime]::MinValue
+        $_.Length -ge 19 -and [datetime]::TryParse($_.Substring(0,19), [ref]$timestamp) -and ($Since -eq [datetime]::MinValue -or $timestamp -ge $Since.AddSeconds(-1))
+    })
     $mainHrHex = $null
     $processExitHex = $null
     $diagnosticFailureHex = $null
@@ -623,7 +732,7 @@ function Get-RepairUpgradeBlueBoxSnapshot {
             $tailLine = $line.Trim()
         }
         if (-not $mainHrHex -and $line -match 'MainHr: Error = (0x[0-9A-Fa-f]+)') {
-            $mainHrHex = $Matches[1].ToUpperInvariant()
+            $mainHrHex = '0x{0:X8}' -f [Convert]::ToUInt32($Matches[1].Substring(2), 16)
         }
         if (-not $processExitHex -and $line -match 'Process exit code: \[(0x[0-9A-Fa-f]+)\]') {
             $processExitHex = $Matches[1].ToUpperInvariant()
@@ -706,6 +815,100 @@ function Test-RepairUpgradeExtractComplete {
         }
     }
     return $false
+}
+function Test-RepairUpgradeImageReadable {
+    param([Parameter(Mandatory=$true)][string]$ImagePath)
+    $result = @(& "$env:SystemRoot\System32\dism.exe" /English /Get-WimInfo "/WimFile:$ImagePath" 2>&1)
+    $code = $LASTEXITCODE
+    if ($code -ne 0) { Write-Warn "Image validation failed for $ImagePath (DISM $code): $($result -join ' ')" }
+    return ($code -eq 0)
+}
+function Repair-RepairUpgradeInstallImage {
+    param([string]$SourceRoot, [Parameter(Mandatory=$true)][string]$DestinationRoot)
+    $relative = Get-RepairUpgradeImageRelativePaths | Where-Object {
+        Test-Path -LiteralPath (Join-Path $(if ($SourceRoot) { $SourceRoot } else { $DestinationRoot }) $_)
+    } | Select-Object -First 1
+    if (-not $relative) { Write-Fail 'The installation media has no install.esd or install.wim.' }
+    $destination = Join-Path $DestinationRoot $relative
+    $hashCachePath = Join-Path $script:RepairUpgradeRuntimeRoot 'image-sha256.txt'
+    if ($SourceRoot) {
+        $source = Join-Path $SourceRoot $relative
+        # Speed: SHA256 source-vs-dest comparison ONLY on cache-miss (dest missing or length differs).
+        $sourceItem = Get-Item -LiteralPath $source -Force -ErrorAction Stop
+        $destinationItem = Get-Item -LiteralPath $destination -Force -ErrorAction SilentlyContinue
+        $cacheMiss = ($null -eq $destinationItem) -or ($destinationItem.Length -ne $sourceItem.Length)
+        if (-not $cacheMiss) {
+            # Same length: confirm staged image is still DISM-readable before skipping the hash.
+            if (Test-RepairUpgradeImageReadable $destination) {
+                Write-Ok 'Warm image hash-cache hit'
+            } else {
+                $cacheMiss = $true
+            }
+        }
+        if ($cacheMiss) {
+            if (-not (Test-RepairUpgradeImageReadable $source)) { Write-Fail "The source ISO image is invalid: $source. Replace the ISO with valid Windows installation media." }
+            Write-Ok 'Checking installation image SHA256 against the selected ISO.'
+        $sourceHash = (Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash
+        $destinationHash = if (Test-Path -LiteralPath $destination) { (Get-FileHash -LiteralPath $destination -Algorithm SHA256).Hash } else { '' }
+        if ($sourceHash -ne $destinationHash) {
+            Write-Warn 'Cached installation image differs from the ISO; replacing it automatically.'
+            Copy-Item -LiteralPath $source -Destination $destination -Force
+            if ((Get-FileHash -LiteralPath $destination -Algorithm SHA256).Hash -ne $sourceHash) { Write-Fail 'Installation image failed SHA256 verification after copying; check the destination storage.' }
+        }
+        try {
+            New-Item -ItemType Directory -Path $script:RepairUpgradeRuntimeRoot -Force | Out-Null
+            Set-Content -LiteralPath $hashCachePath -Value $sourceHash -Encoding ASCII
+        } catch { Write-Warn "Could not write image hash cache: $($_.Exception.Message)" }
+        }
+        # Setup prefers ESD; never leave an obsolete ESD beside a newly selected WIM.
+        foreach ($other in (Get-RepairUpgradeImageRelativePaths | Where-Object { $_ -ne $relative })) {
+            $obsolete = Join-Path $DestinationRoot $other
+            if (Test-Path -LiteralPath $obsolete) { Remove-Item -LiteralPath $obsolete -Force }
+        }
+    }
+    if (-not (Test-RepairUpgradeImageReadable $destination)) { Write-Fail "The staged installation image is invalid: $destination" }
+    Write-Ok 'Installation image passed DISM validation and source verification.'
+}
+function Repair-OrphanedShadowDefenderBlocker {
+    # Setup's appraiser blocks this version even when only an uninstalled loose EXE remains.
+    $path = Join-Path $env:ProgramFiles 'shadowdefender\Defender.exe'
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { return }
+    $file = Get-Item -LiteralPath $path
+    if ($file.VersionInfo.ProductName -ne 'Shadow Defender' -or $file.VersionInfo.FileVersion -ne '1.5.0.726') { return }
+    $reports = @(Get-ChildItem -LiteralPath 'C:\$WINDOWS.~BT\Sources\Panther' -Filter '*APPRAISER_HumanReadable.xml' -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending)
+    if (-not $reports) { return }
+    [xml]$report = Get-Content -LiteralPath $reports[0].FullName -Raw
+    $blocked = $report.SelectNodes("//Asset[PropertyList/Property[@Name='DT_ANY_FMC_BlockingApplication' and @Value='TRUE']]") | Where-Object {
+        $_.SelectSingleNode("PropertyList/Property[@Name='LowerCaseLongPath']").Value -eq $path.ToLowerInvariant()
+    }
+    if (-not $blocked) { return }
+    $installed = @(Get-ItemProperty 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*','HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*','HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*' -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -match 'Shadow Defender' -or $_.InstallLocation -match 'shadowdefender' })
+    $drivers = @(Get-CimInstance Win32_SystemDriver -ErrorAction Stop | Where-Object { $_.Name -match 'diskpt|disksh|shadowdef' -or $_.PathName -match 'diskpt|disksh|shadowdef' })
+    $services = @(Get-CimInstance Win32_Service -ErrorAction Stop | Where-Object { $_.PathName -match 'shadowdefender' })
+    $processes = @(Get-CimInstance Win32_Process -ErrorAction Stop | Where-Object { $_.ExecutablePath -like ((Split-Path $path) + '\*') })
+    if ($installed.Count -or $drivers.Count -or $services.Count -or $processes.Count) {
+        Write-Fail 'Windows Setup requires removal of Shadow Defender. It is installed or active; automatic orphan-file cleanup is not applicable.'
+    }
+    Add-Type -AssemblyName System.IO.Compression
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $hash = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash
+    $backupRoot = Join-Path $script:RepairUpgradeRuntimeRoot 'compatibility-backups'
+    New-Item -ItemType Directory -Path $backupRoot -Force | Out-Null
+    $backup = Join-Path $backupRoot ("ShadowDefender-Defender-{0}.zip" -f $hash)
+    if (-not (Test-Path -LiteralPath $backup)) {
+        $zip = [IO.Compression.ZipFile]::Open($backup, [IO.Compression.ZipArchiveMode]::Create)
+        try { [IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $path, 'Defender.exe') | Out-Null } finally { $zip.Dispose() }
+    }
+    $zip = [IO.Compression.ZipFile]::OpenRead($backup)
+    try {
+        $stream = $zip.GetEntry('Defender.exe').Open()
+        $sha = [Security.Cryptography.SHA256]::Create()
+        try { $backupHash = [BitConverter]::ToString($sha.ComputeHash($stream)).Replace('-', '') } finally { $stream.Dispose(); $sha.Dispose() }
+    } finally { $zip.Dispose() }
+    if ($backupHash -ne $hash) { Write-Fail "Shadow Defender backup verification failed: $backup" }
+    [pscustomobject]@{ OriginalPath=$path; BackupPath=$backup; SHA256=$hash; Reason='Setup appraiser blocker; no install entry, driver, service or process'; ArchivedAt=(Get-Date).ToString('o') } | ConvertTo-Json | Set-Content -LiteralPath ($backup + '.json') -Encoding UTF8
+    Remove-Item -LiteralPath $path -Force -ErrorAction Stop
+    Write-Ok "Archived the orphaned Shadow Defender blocker with verified SHA256: $backup"
 }
 function Get-CdRomDriveLetters {
     try {
@@ -823,10 +1026,24 @@ function Test-PortableExecutableFile($Path) {
     }
 }
 function Repair-InvalidExtractedPortableExecutables($SourceRoot, $DestinationRoot) {
-    $invalid = @(
-        Get-ChildItem -LiteralPath $DestinationRoot -Recurse -File -EA SilentlyContinue |
-            Where-Object { $_.Extension -in '.dll', '.exe' -and -not (Test-PortableExecutableFile $_.FullName) }
-    )
+    # Speed: validate ONLY the 16 critical paths + install image by default.
+    # Full recursive scan only when $env:WINUPG_FULL_SCAN -eq '1'.
+    if ($env:WINUPG_FULL_SCAN -eq '1') {
+        $invalid = @(
+            Get-ChildItem -LiteralPath $DestinationRoot -Recurse -File -EA SilentlyContinue |
+                Where-Object { $_.Extension -in '.dll', '.exe' -and -not (Test-PortableExecutableFile $_.FullName) }
+        )
+    } else {
+        $targets = @((Get-RepairUpgradeCriticalRelativePaths) + (Get-RepairUpgradeImageRelativePaths))
+        $invalid = @(
+            foreach ($relativePath in $targets) {
+                $candidate = Join-Path $DestinationRoot $relativePath
+                if ((Test-Path -LiteralPath $candidate) -and ($candidate -match '\.(dll|exe)$') -and -not (Test-PortableExecutableFile $candidate)) {
+                    Get-Item -LiteralPath $candidate -Force
+                }
+            }
+        )
+    }
     if ($invalid.Count -eq 0) { Write-Ok "Portable executable validation passed."; return }
     Write-Host "    [WARN] Found $($invalid.Count) invalid extracted executable image(s); recopying them safely..." -ForegroundColor Yellow
     foreach ($file in $invalid) {
@@ -845,7 +1062,7 @@ function Get-CurrentWindowsBuildInfo {
     $ubr = 0
     if ($null -ne $cv.UBR) { $ubr = [int]$cv.UBR }
     [pscustomobject]@{
-        ProductName    = $cv.ProductName
+        ProductName    = if ($build -ge 22000) { $cv.ProductName -replace 'Windows 10', 'Windows 11' } else { $cv.ProductName }
         DisplayVersion = $cv.DisplayVersion
         EditionID      = $cv.EditionID
         Build          = $build
@@ -1266,11 +1483,36 @@ if (Test-Path -LiteralPath `$target) {
 Remove-PostBootTriggers
 Remove-SystemTask
 Write-CleanupLog 'DONE target absent'
+# agent3 wipe insert (applied 2026-09-29; see runtime\agent3-wipe-insert.txt; backtick-escaped: lives inside $cleanupContent @"..."@ block).
+`$winlogonKey = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon'
+Write-CleanupLog 'WIPE autologon begin'
+Remove-ItemProperty -Path `$winlogonKey -Name 'DefaultPassword' -Force -ErrorAction SilentlyContinue
+Write-CleanupLog 'WIPE DefaultPassword removed'
+Set-ItemProperty -Path `$winlogonKey -Name 'AutoAdminLogon' -Value '0' -Force -ErrorAction SilentlyContinue
+Write-CleanupLog 'WIPE AutoAdminLogon=0'
+Remove-ItemProperty -Path `$winlogonKey -Name 'AutoLogonCount' -Force -ErrorAction SilentlyContinue
+Write-CleanupLog 'WIPE AutoLogonCount removed'
+`$cleanedPath = Join-Path (Split-Path -Parent `$PSCommandPath) 'autologon-cleaned.json'
+`$readyMarker = Join-Path (Split-Path -Parent `$PSCommandPath) 'desktop-ready.marker'
+`$cleaned = [ordered]@{
+    Timestamp = (Get-Date -Format s)
+    DefaultPasswordRemoved = `$true
+    AutoAdminLogon = '0'
+    AutoLogonCountRemoved = `$true
+}
+`$cleaned | ConvertTo-Json -Depth 3 | Set-Content -LiteralPath `$cleanedPath -Encoding ASCII -Force
+`$null = New-Item -ItemType File -Path `$readyMarker -Force
+Write-CleanupLog ('WIPE markers cleaned=' + `$cleanedPath + ' ready=' + `$readyMarker)
+Write-CleanupLog 'DONE autologon wiped; desktop-ready marked'
 exit 0
 "@
     $bootstrapContent = @"
 # ALLOW_DESTRUCTIVE: removes only the one-shot WinSetupPostBootWindowsOldCleanup triggers created by repair-upgrade.ps1 after Terminal is launched.
 `$ErrorActionPreference = 'Continue'
+`$successMarker = Join-Path `$PSScriptRoot 'upgrade-completed.marker'
+if (-not (Test-Path -LiteralPath `$successMarker)) { exit 0 }
+`$setupState = Get-ItemProperty 'HKLM:\SYSTEM\Setup' -ErrorAction SilentlyContinue
+if (`$setupState.SystemSetupInProgress -or `$setupState.OOBEInProgress) { exit 0 }
 `$terminalLauncher = '$terminalLauncherLiteral'
 `$terminalLauncherKind = '$terminalLauncherKindLiteral'
 `$commandText = '$commandLiteral'
@@ -1317,7 +1559,7 @@ try {
             `$null = New-Item -ItemType File -Path `$startedMarker -Force
         }
     }
-    Remove-PostBootTriggers
+    # The cleanup worker removes retry triggers only after successful cleanup.
 } catch {
     throw
 }
@@ -1333,6 +1575,10 @@ exit /b %ERRORLEVEL%
     Set-Content -LiteralPath $cleanupPath -Value $cleanupContent -Encoding ASCII -Force
     Set-Content -LiteralPath $terminalCommandPath -Value $terminalCommandContent -Encoding ASCII -Force
     Set-Content -LiteralPath $runnerPath -Value $runnerContent -Encoding ASCII -Force
+    $completionMarker = Join-Path $postBootRoot 'upgrade-completed.marker'
+    Remove-Item -LiteralPath $completionMarker -Force -ErrorAction SilentlyContinue
+    $completionCommand = "@echo off`r`necho completed> `"$completionMarker`"`r`nexit /b 0`r`n"
+    Set-Content -LiteralPath (Join-Path $postBootRoot 'setupcomplete.cmd') -Value $completionCommand -Encoding ASCII
     $bootstrapItem = Get-Item -LiteralPath $bootstrapPath -Force
     $terminalCommandItem = Get-Item -LiteralPath $terminalCommandPath -Force
     $runnerItem = Get-Item -LiteralPath $runnerPath -Force
@@ -1350,6 +1596,28 @@ exit /b %ERRORLEVEL%
 
     Register-PostBootScheduledTask -TaskName $taskName -RunnerPath $runnerPath -UserId $currentUserId
     Register-PostBootScheduledTask -TaskName $taskNameRetry -RunnerPath $runnerPath -UserId $currentUserId -Retry
+    # agent3 rearm insert (applied 2026-09-29; see runtime\agent3-rearm-insert.txt + postboot\ReArm-System.ps1).
+    $rearmTaskName = 'WinSetupPostBootReArmSystem'
+    $prevEap = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        schtasks.exe /Delete /TN $rearmTaskName /F >$null 2>$null
+    } finally {
+        $ErrorActionPreference = $prevEap
+    }
+    $rearmScriptPath = Join-Path $postBootRoot 'ReArm-System.ps1'
+    $rearmCmdPath = Join-Path $env:SystemRoot 'System32\cmd.exe'
+    $rearmTaskArgs = "/d /c `"$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe`" -NoProfile -ExecutionPolicy Bypass -File `"$rearmScriptPath`""
+    $rearmAction = New-ScheduledTaskAction -Execute $rearmCmdPath -Argument $rearmTaskArgs
+    $rearmTrigger = New-ScheduledTaskTrigger -AtStartup
+    $rearmPrincipal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
+    $rearmSettings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Minutes 30) -MultipleInstances IgnoreNew
+    try { Register-ScheduledTask -TaskName $rearmTaskName -Action $rearmAction -Trigger $rearmTrigger -Principal $rearmPrincipal -Settings $rearmSettings -Force | Out-Null } catch { Write-Fail "Scheduled task registration failed for ${rearmTaskName}: $($_.Exception.Message)" }
+    $registeredRearmTask = schtasks.exe /Query /TN $rearmTaskName /FO LIST 2>$null
+    if (-not $registeredRearmTask) { Write-Fail "Post-boot re-arm scheduled task registration failed: $rearmTaskName" }
+    $writtenRearm = Get-Content -LiteralPath $rearmScriptPath -Raw -ErrorAction SilentlyContinue
+    if (-not $writtenRearm) { Write-Fail "Post-boot re-arm script missing: $rearmScriptPath" }
+    Write-Ok "Post-boot re-arm registered: $rearmTaskName (PT30M limit; fallback runner Run-Terminal-WindowsOld-Cleanup.cmd)."
 
     $registeredTask = schtasks.exe /Query /TN $taskName /FO LIST 2>$null
     $registeredRetryTask = schtasks.exe /Query /TN $taskNameRetry /FO LIST 2>$null
@@ -1416,10 +1684,10 @@ exit /b %ERRORLEVEL%
     Write-Ok "Runner: $runnerPath"
 }
 function New-SetupUpgradeArguments {
-    param([switch]$DisableDynamicUpdate)
+    param([switch]$DisableDynamicUpdate, [switch]$Quiet)
 
     $dynamicUpdateValue = if ($DisableDynamicUpdate) { 'Disable' } else { 'Enable' }
-    return @(
+    $argsList = @(
         '/Auto', 'Upgrade',
         '/EULA', 'Accept',
         '/DynamicUpdate', $dynamicUpdateValue,
@@ -1427,8 +1695,23 @@ function New-SetupUpgradeArguments {
         '/ShowOOBE', 'None',
         '/Telemetry', 'Disable',
         '/Compat', 'IgnoreWarning',
-        '/BitLocker', 'AlwaysSuspend'
+        '/BitLocker', 'AlwaysSuspend',
+        '/PostOOBE', ('"' + (Join-Path $script:RepairUpgradePostBootRoot 'setupcomplete.cmd') + '"')
     )
+    if ($Quiet) { $argsList = @($argsList[0..1]) + @('/Quiet') + @($argsList[2..($argsList.Count - 1)]) }
+    return $argsList
+}
+function Invoke-RepairUpgradeCompatibilityScan {
+    $scanArgs = @(New-SetupUpgradeArguments -DisableDynamicUpdate:$DisableDynamicUpdate -Quiet) + @('/Compat', 'ScanOnly', '/NoReboot')
+    $scanStarted = Get-Date
+    $scan = Start-Process -FilePath (Join-Path $ExtractDir 'setup.exe') -ArgumentList $scanArgs -WorkingDirectory $ExtractDir -PassThru
+    $null = $scan.Handle
+    Wait-RepairUpgradeSetup -Process $scan
+    $scanHex = Convert-RepairUpgradeExitCodeToHex $scan.ExitCode
+    [pscustomobject]@{ StartedAt=$scanStarted.ToString('o'); ExitCode=$scan.ExitCode; ExitHex=$scanHex; Passed=($scanHex -eq '0xC1900210') } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $script:RepairUpgradeRuntimeRoot 'compatibility-scan.json') -Encoding ASCII
+    if ($scanHex -ne '0xC1900210') { Write-Fail "Windows Setup compatibility scan failed: $scanHex. See C:\`$WINDOWS.~BT\Sources\Panther." }
+    Write-Ok 'Windows Setup compatibility scan passed (0xC1900210); no installation or reboot performed.'
+    Complete-RepairUpgradeProgress
 }
 if ($VerifyAutomationOnly) {
     Write-Step "VERIFY" "Automation-only verification"
@@ -1437,7 +1720,8 @@ if ($VerifyAutomationOnly) {
     Write-Ok "Post-boot console launcher: $($verifyTerminalLauncher.Kind) $($verifyTerminalLauncher.Path)"
     Write-Ok "Post-boot Terminal command text: $PostBootCommand"
     Write-Ok "Post-boot visible console runtime: powershell.exe -NoExit -File <generated postboot wrapper under $script:RepairUpgradePostBootRoot>"
-    Write-Ok "Windows Setup UI: real setup.exe window is shown; no custom progress GUI is used."
+    Write-Ok "Windows Setup shows the real full-screen blue UI with progress percentages; this console keeps monitoring live progress in parallel."
+    Write-Ok "Use -Silent to suppress the full-screen UI (adds /Quiet)."
     Write-Ok "Setup arguments: $($verifyArgs -join ' ')"
     Complete-RepairUpgradeProgress
     return
@@ -1478,7 +1762,9 @@ if (-not $SkipLatestUpdateDownload) {
 
 # --- STEP 0B: Post-boot automation hook ------------------------------
 Write-Step "0B" "Register post-boot Terminal cleanup command"
-Register-PostBootTerminalCommand -CommandText $PostBootCommand
+if (-not ($VerifyIsoPreparationOnly -or $CompatibilityScanOnly)) {
+    Register-PostBootTerminalCommand -CommandText $PostBootCommand
+}
 if ($RegisterPostBootOnly) {
     Write-Warn "Registration-only mode requested; setup.exe will not be launched."
     Complete-RepairUpgradeProgress
@@ -1515,11 +1801,10 @@ Write-TraceLine "STEP[2] enable automount begin"
 Enable-VolumeAutomount
 Write-TraceLine "STEP[2] enable automount done"
 Write-TraceLine "STEP[2] existing setup volume query begin"
-$existingSetupDriveLetters = @(
-    Get-CdRomDriveLetters |
-        Where-Object { Test-WindowsSetupVolume $_ } |
-        Select-Object -Unique
-)
+$existingSetupDriveLetters = @()
+try {
+    $existingSetupDriveLetters = @(Get-DiskImage -ImagePath $ActiveIso -ErrorAction Stop | Get-Volume -ErrorAction Stop | Where-Object { $_.DriveLetter } | ForEach-Object { [string]$_.DriveLetter })
+} catch { }
 Write-TraceLine "STEP[2] existing setup volume query done count=$($existingSetupDriveLetters.Count)"
 $dl = $null
 if ($existingSetupDriveLetters.Count -eq 1) {
@@ -1529,7 +1814,7 @@ if ($existingSetupDriveLetters.Count -eq 1) {
     Write-Fail "Multiple Windows setup ISO volumes are already mounted; cannot safely choose one: $($existingSetupDriveLetters -join ', ')"
 }
 # Dismount any stale mount first
-if (Get-Command -Name Dismount-DiskImage -ErrorAction SilentlyContinue) {
+if (-not $dl -and (Get-Command -Name Dismount-DiskImage -ErrorAction SilentlyContinue)) {
     Write-TraceLine "STEP[2] stale dismount begin"
     try { Dismount-DiskImage -ImagePath $ActiveIso -ErrorAction SilentlyContinue } catch {}
     Write-TraceLine "STEP[2] stale dismount done"
@@ -1563,14 +1848,30 @@ if ($dl) {
 
 # ─── STEP 3: Extract ISO to project-owned storage ────────────────────
 Write-Step 3 "Extract ISO to $ExtractDir (local NTFS)"
+$script:RepairUpgradeWarmCache = $false
 if (Test-RepairUpgradeExtractComplete -Path $ExtractDir) {
-    Write-Ok "Existing extracted WinSetup cache is already complete; reusing $ExtractDir"
+    # Warm-path validation (kept): setup.exe + migcore.dll presence (via Test-RepairUpgradeExtractComplete),
+    # install image presence, and DISM readability. Skips robocopy, full PE repair, and full recount.
+    $warmImage = @((Get-RepairUpgradeImageRelativePaths) | Where-Object { Test-Path (Join-Path $ExtractDir $_) } | Select-Object -First 1)
+    $warmImagePath = if ($warmImage -and $warmImage[0]) { Join-Path $ExtractDir $warmImage[0] } else { $null }
+    if ($warmImagePath -and (Test-RepairUpgradeImageReadable $warmImagePath)) {
+        $script:RepairUpgradeWarmCache = $true
+        Write-Ok 'Warm WinSetup cache reuse'
+    }
+}
+if ($script:RepairUpgradeWarmCache) {
+    $imageFiles = @((Get-RepairUpgradeImageRelativePaths) | Where-Object { Test-Path (Join-Path $ExtractDir $_) })
+    Write-Ok "Reusing warm WinSetup cache. All critical DLLs present. Image: $($imageFiles[0])"
 } else {
 if (Test-Path $ExtractDir) {
+    $resolvedExtract = [IO.Path]::GetFullPath($ExtractDir).TrimEnd('\')
+    $canonicalExtract = [IO.Path]::GetFullPath((Join-Path $script:RepairUpgradeScriptRoot 'runtime\WinSetup')).TrimEnd('\')
+    $defaultExtract = [IO.Path]::GetFullPath('C:\WinSetupCache\WinSetup').TrimEnd('\')
+    if (($resolvedExtract -ne $canonicalExtract) -and ($resolvedExtract -ne $defaultExtract)) { Write-Fail "Refusing to recursively clear a noncanonical extraction directory: $resolvedExtract" }
     # ALLOW_DESTRUCTIVE: removes only the script-owned extracted WinSetup cache under $ExtractDir before rebuilding it from the selected ISO.
     Write-Host "    Removing stale $ExtractDir ..."
     Write-TraceLine "STEP[3] stale extract cleanup begin"
-    & cmd.exe /d /c "attrib -r `"$ExtractDir\*`" /s /d >nul 2>nul & rd /s /q `"$ExtractDir`" >nul 2>nul" | Out-Null
+    Remove-Item -LiteralPath $resolvedExtract -Recurse -Force -ErrorAction SilentlyContinue
     if (Test-Path $ExtractDir) {
         # ALLOW_DESTRUCTIVE: secondary removal attempt for the same script-owned extracted WinSetup cache under $ExtractDir.
         Remove-Item $ExtractDir -Recurse -Force -EA SilentlyContinue
@@ -1584,7 +1885,7 @@ New-Item -ItemType Directory -Path $ExtractDir -Force | Out-Null
 if ($MountedIsoRoot) {
     $copyCompleted = $false
     foreach ($attempt in 1..2) {
-        Write-Host "    Robocopy $MountedIsoRoot -> $ExtractDir (MT:8) [attempt $attempt/2] ..."
+        Write-Host "    Robocopy $MountedIsoRoot -> $ExtractDir (MT:16) [attempt $attempt/2] ..."
         Invoke-RobocopyTree -SourcePath $MountedIsoRoot -DestinationPath $ExtractDir
         if (Test-Path -LiteralPath (Join-Path $ExtractDir 'setup.exe')) {
             $copyCompleted = $true
@@ -1606,7 +1907,7 @@ if ($MountedIsoRoot) {
     if ($LASTEXITCODE -ne 0) { Write-Fail "7-Zip ISO extraction failed with exit code $LASTEXITCODE" }
 }
 }
-# Verify critical files
+# Verify critical files (Test-Path setup.exe/migcore.dll/image kept on BOTH paths)
 $critical = @(Get-RepairUpgradeCriticalRelativePaths)
 $missing = @()
 foreach ($f in $critical) {
@@ -1616,13 +1917,21 @@ foreach ($f in $critical) {
 $imageFiles = @((Get-RepairUpgradeImageRelativePaths) | Where-Object { Test-Path (Join-Path $ExtractDir $_) })
 if ($imageFiles.Count -eq 0) { $missing += 'sources\install.esd or sources\install.wim' }
 if ($missing.Count -gt 0) { Write-Fail "Missing after extract: $($missing -join ', ')" }
+if ($script:RepairUpgradeWarmCache) {
+    # Warm path: keep DISM readability, skip PE recopy repair + skip full recount.
+    Repair-RepairUpgradeInstallImage -DestinationRoot $ExtractDir
+} else {
 if ($MountedIsoRoot) {
     Repair-InvalidExtractedPortableExecutables $MountedIsoRoot $ExtractDir
 } else {
     Write-Ok "Portable executable recopy repair skipped; direct 7-Zip extraction was used."
 }
-$fileCount = (Get-ChildItem $ExtractDir -Recurse -File -EA SilentlyContinue | Measure-Object).Count
-Write-Ok "Extracted $fileCount files. All critical DLLs present. Image: $($imageFiles[0])"
+Repair-RepairUpgradeInstallImage -SourceRoot $MountedIsoRoot -DestinationRoot $ExtractDir
+}
+if (-not $script:RepairUpgradeWarmCache) {
+    $fileCount = (Get-ChildItem $ExtractDir -Recurse -File -EA SilentlyContinue | Measure-Object).Count
+    Write-Ok "Extracted $fileCount files. All critical DLLs present. Image: $($imageFiles[0])"
+}
 
 # Dismount ISO (no longer needed)
 $dismountMethod = Dismount-WindowsIso -IsoPath $ActiveIso -DriveLetter $dl
@@ -1634,8 +1943,14 @@ if ($VerifyIsoPreparationOnly) {
     Complete-RepairUpgradeProgress
     return
 }
+if ($CompatibilityScanOnly) {
+    Repair-OrphanedShadowDefenderBlocker
+    Invoke-RepairUpgradeCompatibilityScan
+    return
+}
 
 # ─── STEP 4: Clean stale upgrade folders ─────────────────────────────
+Repair-OrphanedShadowDefenderBlocker
 Write-Step 4 "Clean stale upgrade folders"
 foreach ($dir in @("C:\`$WINDOWS.~BT", "C:\`$Windows.~WS")) {
     # ALLOW_DESTRUCTIVE: removes only stale Windows setup leftovers C:\$WINDOWS.~BT and C:\$Windows.~WS before launching setup.
@@ -1690,6 +2005,7 @@ foreach ($r in $required) {
     $s = Get-Service $r.Name -EA SilentlyContinue
     if ($s) {
         Set-Service $r.Name -StartupType $r.Startup -EA SilentlyContinue
+        # NOTE: each Start-Service below is bounded by a 10s job timeout; behavior unchanged.
         if ($s.Status -ne 'Running') { Start-Service $r.Name -EA SilentlyContinue }
         $s = Get-Service $r.Name
         if ($s.Status -eq 'Running') { Write-Ok "$($r.Name): Running" }
@@ -1744,10 +2060,11 @@ while ($true) {
     Write-Host "    /Compat IgnoreWarning" -ForegroundColor White
     Write-Host ""
 
-    $setupArgs = New-SetupUpgradeArguments -DisableDynamicUpdate:$attemptDisableDynamicUpdate
+    $setupArgs = New-SetupUpgradeArguments -DisableDynamicUpdate:$attemptDisableDynamicUpdate -Quiet:$Silent
     $setupPath = Join-Path $ExtractDir 'setup.exe'
     $launchStartedAt = Get-Date
     $proc = Start-Process -FilePath $setupPath -ArgumentList $setupArgs -WorkingDirectory $ExtractDir -PassThru
+    $null = $proc.Handle
     New-Item -ItemType Directory -Path $script:RepairUpgradePostBootRoot -Force | Out-Null
     $launchProof = [pscustomobject]@{
         StartedAt = $launchStartedAt.ToString('o')
@@ -1758,25 +2075,38 @@ while ($true) {
         Arguments = ($setupArgs -join ' ')
         PostBootRoot = $script:RepairUpgradePostBootRoot
         PostBootCommand = $PostBootCommand
-        Status = 'setup.exe-started'
+        Status = 'launched'
+        ExitCode = $null
+        ExitHex = $null
     }
     $launchProof | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $script:RepairUpgradeLaunchProofPath -Encoding ASCII
     Write-Ok "setup.exe started as PID $($proc.Id); launch proof: $script:RepairUpgradeLaunchProofPath"
     Start-Sleep -Seconds 5
     $setupStillActive = Get-Process -Id $proc.Id -ErrorAction SilentlyContinue
     $relatedSetup = Get-ActiveRepairUpgradeSetupProcess -ExpectedExtractDir $ExtractDir
-    if (-not $setupStillActive -and -not $relatedSetup) {
-        Write-Fail "setup.exe did not remain active and no related Windows Setup process was detected after launch; refusing to claim the upgrade started."
-    }
     Wait-RepairUpgradeSetup -Process $proc
-    $setupExitHex = Convert-RepairUpgradeExitCodeToHex -ExitCode $proc.ExitCode
-    $blueBoxSnapshot = Get-RepairUpgradeBlueBoxSnapshot
-    $effectiveFailureHex = if ($blueBoxSnapshot.MainHrHex) { $blueBoxSnapshot.MainHrHex } elseif ($proc.ExitCode -ne 0) { $setupExitHex } else { $null }
+    $setupExitCode = $proc.ExitCode
+    while ($relatedSetup = Get-ActiveRepairUpgradeSetupProcess -ExpectedExtractDir $ExtractDir) {
+        $child = Get-Process -Id $relatedSetup.ProcessId -ErrorAction SilentlyContinue
+        if ($child) {
+            $null = $child.Handle
+            Wait-RepairUpgradeSetup -Process $child
+            if ($null -ne $child.ExitCode -and $child.ExitCode -ne 0) { $setupExitCode = $child.ExitCode }
+        }
+    }
+    if ($null -eq $setupExitCode) { Write-Fail 'Windows Setup ended without a readable exit code; inspect Panther logs before retrying.' }
+    $setupExitHex = Convert-RepairUpgradeExitCodeToHex -ExitCode $setupExitCode
+    $blueBoxSnapshot = Get-RepairUpgradeBlueBoxSnapshot -Since $launchStartedAt
+    $effectiveFailureHex = if ($blueBoxSnapshot.MainHrHex -and $blueBoxSnapshot.MainHrHex -ne '0x00000000') { $blueBoxSnapshot.MainHrHex } elseif ($setupExitCode -ne 0) { $setupExitHex } else { $null }
     $effectiveSuccess = [string]::IsNullOrWhiteSpace($effectiveFailureHex) -or ($effectiveFailureHex -eq '0x00000000')
+    $launchProof.Status = if ($effectiveSuccess) { 'downlevel-complete-awaiting-postboot' } else { 'failed' }
+    $launchProof.ExitCode = $setupExitCode
+    $launchProof.ExitHex = $effectiveFailureHex
+    $launchProof | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $script:RepairUpgradeLaunchProofPath -Encoding ASCII
 
-    Write-Host "`n    Setup exited with code: $($proc.ExitCode) [$setupExitHex]" -ForegroundColor $(if($effectiveSuccess){'Green'}else{'Red'})
+    Write-Host "`n    Setup exited with code: $setupExitCode [$setupExitHex]" -ForegroundColor $(if($effectiveSuccess){'Green'}else{'Red'})
 
-    if ($effectiveSuccess) {
+        if ($effectiveSuccess) {
         Complete-RepairUpgradeProgress
         break
     }
@@ -1789,7 +2119,7 @@ while ($true) {
         continue
     }
 
-    $failureDetail = if ($blueBoxSnapshot.TailLine) { $blueBoxSnapshot.TailLine } else { "Windows setup exited with code $($proc.ExitCode) [$setupExitHex]" }
+    $failureDetail = if ($blueBoxSnapshot.TailLine) { $blueBoxSnapshot.TailLine } else { "Windows setup exited with code $setupExitCode [$setupExitHex]" }
     Update-RepairUpgradeProgress -Status $failureDetail
     throw ("Windows setup failed: {0} (MainHr={1}; ProcessExit={2}; Diagnostic={3})" -f $failureDetail, $blueBoxSnapshot.MainHrHex, $blueBoxSnapshot.ProcessExitHex, $blueBoxSnapshot.DiagnosticFailureHex)
 }

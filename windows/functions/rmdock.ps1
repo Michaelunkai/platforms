@@ -4,7 +4,7 @@
 # was copied from. The module is also force-re-imported when the copy
 # loaded in this process is stale (psm1 changed on disk) so a long-
 # running session never runs an outdated dispatcher.
-$__2scProfileModule = 'C:\Users\micha\Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1'
+$__2scProfileModule = (Join-Path $env:USERPROFILE 'Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1')
 $__2scNeedBootstrap = -not (Get-Command -Name 'Initialize-CodexProfileFunctions' -CommandType Function -ErrorAction SilentlyContinue)
 if (-not $__2scNeedBootstrap) {
     $__2scLoadedModule = Get-Module -Name 'CodexProfileFunctions' -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -28,15 +28,13 @@ if ($__2scNeedBootstrap) {
     Initialize-CodexProfileFunctions
 }
 function rmdock {
-    $script = 'F:\study\Learning\01\01\Shells\powershell\profile-functions\windows\cleanup\maintenance-tools\Rmdock\Invoke-rmdock.ps1'
-    if (-not (Test-Path -LiteralPath $script)) {
-        throw "rmdock script not found: $script"
-    }
-    if ($args -contains '-SelfTest') {
-        & $script @args
-        return
-    }
-    . $script @args
+    [CmdletBinding()]
+    param([switch]$FactoryReset,[string]$ConfirmFactoryReset='',[switch]$NoRestart)
+    $safeDkill = 'F:\study\Platforms\windows\functions\dkill.ps1'
+    if (-not (Test-Path -LiteralPath $safeDkill -PathType Leaf)) { throw "Canonical Docker recovery script not found: $safeDkill" }
+    Write-Host 'rmdock is protected: using the bounded Docker VMM recovery path.' -ForegroundColor Cyan
+    & $safeDkill -FactoryReset:$FactoryReset -ConfirmFactoryReset $ConfirmFactoryReset -NoRestart:$NoRestart
+    $global:LASTEXITCODE = [int]$LASTEXITCODE
 }
 
 if ($MyInvocation.InvocationName -ne '.') {

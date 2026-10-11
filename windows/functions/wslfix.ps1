@@ -4,7 +4,7 @@
 # was copied from. The module is also force-re-imported when the copy
 # loaded in this process is stale (psm1 changed on disk) so a long-
 # running session never runs an outdated dispatcher.
-$__2scProfileModule = 'C:\Users\micha\Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1'
+$__2scProfileModule = Join-Path $env:USERPROFILE 'Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1'
 $__2scNeedBootstrap = -not (Get-Command -Name 'Initialize-CodexProfileFunctions' -CommandType Function -ErrorAction SilentlyContinue)
 if (-not $__2scNeedBootstrap) {
     $__2scLoadedModule = Get-Module -Name 'CodexProfileFunctions' -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -28,11 +28,11 @@ if ($__2scNeedBootstrap) {
     Initialize-CodexProfileFunctions
 }
 function wslfix {
-    $script = "F:\study\shells\powershell\scripts\wsl_fixer.ps1"
-    if (Test-Path $script) {
-        & "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File $script
+    $script = Join-Path $env:USERPROFILE 'Documents\WindowsPowerShell\legacy-safe-functions\Invoke-FixWsl2.ps1'
+    if (Test-Path -LiteralPath $script -PathType Leaf) {
+        & $script @args
     } else {
-        Write-Host "wsl_fixer.ps1 not found at $script" -ForegroundColor Red
+        Write-Warning "wslfix: helper script is unavailable at $script; no WSL changes were made."
     }
 }
 

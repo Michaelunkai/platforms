@@ -4,7 +4,7 @@
 # was copied from. The module is also force-re-imported when the copy
 # loaded in this process is stale (psm1 changed on disk) so a long-
 # running session never runs an outdated dispatcher.
-$__2scProfileModule = 'C:\Users\micha\Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1'
+$__2scProfileModule = Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::MyDocuments)) 'WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1'
 $__2scNeedBootstrap = -not (Get-Command -Name 'Initialize-CodexProfileFunctions' -CommandType Function -ErrorAction SilentlyContinue)
 if (-not $__2scNeedBootstrap) {
     $__2scLoadedModule = Get-Module -Name 'CodexProfileFunctions' -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -34,9 +34,17 @@ function ass {
         [Parameter(ValueFromRemainingArguments = $true)][object[]]$RemainingArgs
     )
 
-    $exe = 'C:\Users\micha\Documents\WindowsPowerShell\legacy-safe-functions\AssLatestGameBackup\AssLatestGameBackup.exe'
+    $exe = @(
+        'F:\study\projects\SystemMonitor\PSProcLasso\Windows\Applications\Gaming\SaveData\AssLatestGameBackup\dist\AssLatestGameBackup.exe',
+        'F:\study\Windows\Applications\Gaming\SaveData\AssLatestGameBackup\dist\AssLatestGameBackup.exe',
+        (Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::MyDocuments)) 'WindowsPowerShell\legacy-safe-functions\AssLatestGameBackup\AssLatestGameBackup.exe')
+    ) | Where-Object { [IO.File]::Exists($_) } | Select-Object -First 1
     if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) {
-        throw "ass executable not found: $exe"
+        if ($SelfTest) {
+            throw "ass executable not found: $exe"
+        }
+        Write-Warning "ASS_SKIPPED reason=executable_missing path=$exe"
+        return
     }
 
     if ($SelfTest) {

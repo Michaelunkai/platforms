@@ -1032,7 +1032,12 @@ function Invoke-UniInstallerKeys {
         foreach ($vn in @($item.GetValueNames())) {
             $data = $item.GetValue($vn)
             if ($ReExact.IsMatch($vn) -or ($data -and $ReExact.IsMatch([string]$data))) {
-                Remove-ItemProperty -LiteralPath $root -Name $vn -ErrorAction SilentlyContinue
+                # empty name = the key's (default) value, which Remove-ItemProperty rejects
+                if ([string]::IsNullOrEmpty($vn)) {
+                    Clear-ItemProperty -LiteralPath $root -Name '(default)' -ErrorAction SilentlyContinue
+                } else {
+                    Remove-ItemProperty -LiteralPath $root -Name $vn -ErrorAction SilentlyContinue
+                }
                 $script:UniStats.RegValues++
                 Clear-UniLine
                 Write-Host ("  run entry removed: {0} :: {1}" -f $root, $vn) -ForegroundColor Green
@@ -1092,7 +1097,13 @@ function Invoke-UniRegistrySweep {
             $rp = 'Registry::' + $item.Substring(2, $sep - 2)
             $vn = $item.Substring($sep + 1)
             Update-UniLine ("[{0}] registry sweep [{1}/{2}]: value {3} :: {4}" -f (Get-UniElapsed), $i, $items.Count, $item.Substring(2, $sep - 2), $vn)
-            Remove-ItemProperty -LiteralPath $rp -Name $vn -ErrorAction SilentlyContinue
+            # An empty value name is the key's (default) value: Remove-ItemProperty
+            # rejects empty names, so clear it via Clear-ItemProperty instead.
+            if ([string]::IsNullOrEmpty($vn)) {
+                Clear-ItemProperty -LiteralPath $rp -Name '(default)' -ErrorAction SilentlyContinue
+            } else {
+                Remove-ItemProperty -LiteralPath $rp -Name $vn -ErrorAction SilentlyContinue
+            }
             $script:UniStats.RegValues++
             Clear-UniLine
             Write-Host ("  registry value removed: {0} :: {1}" -f $item.Substring(2, $sep - 2), $vn) -ForegroundColor DarkGreen
@@ -1212,7 +1223,12 @@ function Invoke-UniMru {
             if ($data -is [byte[]]) { $text = [System.Text.Encoding]::Unicode.GetString($data) }
             elseif ($data) { $text = [string]$data }
             if ($text -and $ReExact.IsMatch($text)) {
-                Remove-ItemProperty -LiteralPath $root -Name $vn -ErrorAction SilentlyContinue
+                # empty name = the key's (default) value, which Remove-ItemProperty rejects
+                if ([string]::IsNullOrEmpty($vn)) {
+                    Clear-ItemProperty -LiteralPath $root -Name '(default)' -ErrorAction SilentlyContinue
+                } else {
+                    Remove-ItemProperty -LiteralPath $root -Name $vn -ErrorAction SilentlyContinue
+                }
                 $script:UniStats.RegValues++
                 Clear-UniLine
                 Write-Host ("  MRU entry removed: {0} :: {1}" -f $root, $vn) -ForegroundColor DarkGreen

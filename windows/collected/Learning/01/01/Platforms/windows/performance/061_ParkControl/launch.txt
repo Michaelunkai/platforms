@@ -1,1 +1,0 @@
-﻿iwr "https://bitsum.com/files/parkcontrolsetup.exe" -OutFile "$env:TEMP\parkcontrolsetup.exe"; & "$env:TEMP\parkcontrolsetup.exe"

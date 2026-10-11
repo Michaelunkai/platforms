@@ -3,7 +3,7 @@
 # outside a profile session so it behaves exactly like the function it
 # was copied from.
 if (-not (Get-Command -Name 'Initialize-CodexProfileFunctions' -CommandType Function -ErrorAction SilentlyContinue)) {
-    $__2scProfileModule = 'C:\Users\micha\Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1'
+    $__2scProfileModule = (Join-Path $env:USERPROFILE 'Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1')
     if (-not (Test-Path -LiteralPath $__2scProfileModule -PathType Leaf)) {
         throw "2sc-generated script requires the Codex profile module: $__2scProfileModule"
     }
@@ -24,13 +24,13 @@ function Restore-NvidControlPanelBaseline {
             'ProgramData_NVIDIA Corporation_NVIDIA App_NvConfig' = 'C:\ProgramData\NVIDIA Corporation\NVIDIA App\NvConfig'
             'ProgramData_NVIDIA Corporation_NVIDIA App_AcceptedEULA.txt' = 'C:\ProgramData\NVIDIA Corporation\NVIDIA App\AcceptedEULA.txt'
             'ProgramData_NVIDIA Corporation_NVIDIA App_NvBackend_config.xml' = 'C:\ProgramData\NVIDIA Corporation\NVIDIA App\NvBackend\config.xml'
-            'Users_micha_AppData_Local_NVIDIA Corporation_NVIDIA App_storage.json' = 'C:\Users\micha\AppData\Local\NVIDIA Corporation\NVIDIA App\storage.json'
-            'Users_micha_AppData_Local_NVIDIA Corporation_NVIDIA App_overrides.json' = 'C:\Users\micha\AppData\Local\NVIDIA Corporation\NVIDIA App\overrides.json'
-            'Users_micha_AppData_Local_NVIDIA Corporation_NVIDIA App_NvBackend_config.xml' = 'C:\Users\micha\AppData\Local\NVIDIA Corporation\NVIDIA App\NvBackend\config.xml'
-            'Users_micha_AppData_Local_NVIDIA Corporation_NVIDIA App_NvBackend_batteryboost2.json' = 'C:\Users\micha\AppData\Local\NVIDIA Corporation\NVIDIA App\NvBackend\batteryboost2.json'
-            'Users_micha_AppData_Local_NVIDIA Corporation_NVIDIA App_NvBackend_nis2settings.json' = 'C:\Users\micha\AppData\Local\NVIDIA Corporation\NVIDIA App\NvBackend\nis2settings.json'
-            'Users_micha_AppData_Local_NVIDIA Corporation_NVIDIA App_NvBackend_QuietMode2SupportState.json' = 'C:\Users\micha\AppData\Local\NVIDIA Corporation\NVIDIA App\NvBackend\QuietMode2SupportState.json'
-            'Users_micha_AppData_Local_NVIDIA Corporation_NVIDIA App_NvBackend_SHIM.json' = 'C:\Users\micha\AppData\Local\NVIDIA Corporation\NVIDIA App\NvBackend\SHIM.json'
+            'Users_micha_AppData_Local_NVIDIA Corporation_NVIDIA App_storage.json' = 'C:\Users\Admin\AppData\Local\NVIDIA Corporation\NVIDIA App\storage.json'
+            'Users_micha_AppData_Local_NVIDIA Corporation_NVIDIA App_overrides.json' = 'C:\Users\Admin\AppData\Local\NVIDIA Corporation\NVIDIA App\overrides.json'
+            'Users_micha_AppData_Local_NVIDIA Corporation_NVIDIA App_NvBackend_config.xml' = 'C:\Users\Admin\AppData\Local\NVIDIA Corporation\NVIDIA App\NvBackend\config.xml'
+            'Users_micha_AppData_Local_NVIDIA Corporation_NVIDIA App_NvBackend_batteryboost2.json' = 'C:\Users\Admin\AppData\Local\NVIDIA Corporation\NVIDIA App\NvBackend\batteryboost2.json'
+            'Users_micha_AppData_Local_NVIDIA Corporation_NVIDIA App_NvBackend_nis2settings.json' = 'C:\Users\Admin\AppData\Local\NVIDIA Corporation\NVIDIA App\NvBackend\nis2settings.json'
+            'Users_micha_AppData_Local_NVIDIA Corporation_NVIDIA App_NvBackend_QuietMode2SupportState.json' = 'C:\Users\Admin\AppData\Local\NVIDIA Corporation\NVIDIA App\NvBackend\QuietMode2SupportState.json'
+            'Users_micha_AppData_Local_NVIDIA Corporation_NVIDIA App_NvBackend_SHIM.json' = 'C:\Users\Admin\AppData\Local\NVIDIA Corporation\NVIDIA App\NvBackend\SHIM.json'
         }
         foreach($entry in $map.GetEnumerator()) {
             $src = Join-Path $baseline $entry.Key

@@ -4,7 +4,7 @@
 # was copied from. The module is also force-re-imported when the copy
 # loaded in this process is stale (psm1 changed on disk) so a long-
 # running session never runs an outdated dispatcher.
-$__2scProfileModule = 'C:\Users\micha\Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1'
+$__2scProfileModule = (Join-Path $env:USERPROFILE 'Documents\WindowsPowerShell\Modules\CodexProfileFunctions\CodexProfileFunctions.psd1')
 $__2scNeedBootstrap = -not (Get-Command -Name 'Initialize-CodexProfileFunctions' -CommandType Function -ErrorAction SilentlyContinue)
 if (-not $__2scNeedBootstrap) {
     $__2scLoadedModule = Get-Module -Name 'CodexProfileFunctions' -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -31,11 +31,11 @@ function Load-FullPowerShellProfile {
     if ($script:FullProfileLoaded) { return }
     $fullProfileLibraryPath = $script:FullProfileLibraryPath
     if ([string]::IsNullOrWhiteSpace($fullProfileLibraryPath)) {
-        $fullProfileLibraryPath = 'C:\Users\micha\Documents\WindowsPowerShell\ProfileSources\ps5-profile-portable\Microsoft.PowerShell_profile.full.ps1'
+        $fullProfileLibraryPath = 'C:\Users\Admin\Documents\WindowsPowerShell\ProfileSources\ps5-profile-portable\Microsoft.PowerShell_profile.full.ps1'
     }
     $fullProfileDefinitionCachePath = $script:FullProfileDefinitionCachePath
     if ([string]::IsNullOrWhiteSpace($fullProfileDefinitionCachePath)) {
-        $fullProfileDefinitionCachePath = 'C:\Users\micha\Documents\WindowsPowerShell\ProfileSources\ps5-profile-portable\Microsoft.PowerShell_profile.full.definitions.ps1'
+        $fullProfileDefinitionCachePath = 'C:\Users\Admin\Documents\WindowsPowerShell\ProfileSources\ps5-profile-portable\Microsoft.PowerShell_profile.full.definitions.ps1'
     }
     if (-not (Test-Path -LiteralPath $fullProfileLibraryPath -PathType Leaf)) {
         throw "Full PowerShell profile library not found: $fullProfileLibraryPath"
